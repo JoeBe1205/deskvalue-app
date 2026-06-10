@@ -12,6 +12,8 @@
 <meta name="application-name" content="DeskValue">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -22,6 +24,13 @@ body{font-family:Arial,sans-serif;background:var(--bg);color:var(--txt);min-heig
 .app{display:grid;grid-template-columns:1fr 370px;min-height:100vh}
 .form{padding:28px 36px;overflow-y:auto}
 .sidebar{background:#222;padding:20px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .3s}
+@media(max-width:768px){
+  .app{grid-template-columns:1fr}
+  .form{padding:16px}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;height:auto;max-height:50vh;top:auto;z-index:100;border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .3s}
+  .sidebar.mobile-open{transform:translateY(0)}
+  .mobile-preview-btn{display:flex!important}
+}
 
 .apphead{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .brand{font-size:19px;font-weight:700;letter-spacing:-.3px}
@@ -92,12 +101,26 @@ select{cursor:pointer}
 .dl-btn:disabled{background:#888;cursor:not-allowed}
 .hint{font-size:10.5px;color:#888;line-height:1.5}
 .hint b{color:#aaa}
+.gsync-bar{display:flex;align-items:center;gap:10px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:12px}
+.gsync-bar .status{flex:1;color:#888}
+.gsync-bar .status.ok{color:#27ae60}
+.gsync-bar .status.err{color:#c0392b}
+.gsync-bar .status.loading{color:#e6a817}
+.gsync-btn{background:none;border:1px solid #444;color:#aaa;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:Arial,sans-serif;white-space:nowrap;transition:all .15s}
+.gsync-btn:hover{border-color:#c0392b;color:#c0392b}
+.gsync-btn.connected{border-color:#27ae60;color:#27ae60}
 </style>
 </head>
 <body>
 <div class="app">
 <div class="form">
-  <div class="apphead">
+  <div style="display:none;position:fixed;bottom:20px;right:20px;z-index:99" class="mobile-preview-btn" id="mobilePreviewBtn">
+  <button onclick="toggleMobileSidebar()" style="background:#c0392b;color:#fff;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;font-family:Arial,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;gap:8px">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Vorschau &amp; Export
+  </button>
+</div>
+<div class="apphead">
     <div class="brand">Desk<span>Value</span></div>
     <div class="pill">Rechnungsersteller</div>
   </div>
@@ -159,7 +182,14 @@ select{cursor:pointer}
 </div>
 
 <div class="sidebar">
+  <!-- Google Sheets Sync Bar -->
+  <div class="gsync-bar" id="gsyncBar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+    <span class="status" id="gsyncStatus">Nicht verbunden</span>
+    <button class="gsync-btn" id="gsyncBtn" onclick="gSignIn()">Google</button>
+  </div>
   <div style="display:flex;align-items:center;justify-content:space-between">
+  <button onclick="toggleMobileSidebar()" class="mobile-preview-btn" style="display:none;background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1;padding:0">&#215;</button>
     <div class="prev-label">Vorschau</div>
     <button id="toggleBtn" onclick="togglePreview()" style="background:none;border:1px solid #444;color:#888;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:Arial,sans-serif;transition:all .15s" onmouseover="this.style.borderColor='#c0392b';this.style.color='#c0392b'" onmouseout="this.style.borderColor='#444';this.style.color='#888'">Ausblenden</button>
   </div>
@@ -188,11 +218,21 @@ select{cursor:pointer}
     </svg>
     Rechnung als .docx
   </button>
-  <button class="dl-btn" onclick="saveRechnung()" style="background:#27ae60;margin-top:-6px">
+  <button class="dl-btn" onclick="saveRechnungAndSync()" style="background:#27ae60;margin-top:-6px">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     + Für EÜR merken
   </button>
   <p class="hint"><b>Tipp:</b> In Word &#246;ffnen &#8594; Datei &#8594; Als PDF exportieren.</p>
+  <div style="display:flex;gap:6px">
+    <button class="dl-btn" onclick="syncAll()" style="background:#1a7340;flex:1;font-size:12px;padding:9px 6px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Sync
+    </button>
+    <button class="dl-btn" onclick="ladeEntwurf()" style="background:#555;flex:1;font-size:12px;padding:9px 6px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      Laden
+    </button>
+  </div>
   <hr style="border:none;border-top:1px solid #333;margin:4px 0">
   <button class="dl-btn" id="euerbtn" onclick="showEuer()" style="background:#2a6496">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
@@ -675,7 +715,197 @@ function exportEuer(){
   closeEuer();
 }
 
-// PWA Service Worker
+// ── GOOGLE SHEETS SYNC ──────────────────────────────────────
+const SPREADSHEET_ID = "102565a1J5fWhHmu0jnnNvwqiXM6Aje4f9QjqCdTk31A";
+const CLIENT_ID      = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
+const SCOPES         = "https://www.googleapis.com/auth/spreadsheets";
+const SHEET_RG       = "Rechnungen";
+const SHEET_ENV      = "Entwürfe";
+
+let gAccessToken = null;
+let tokenClient  = null;
+
+// GIS initialisieren (nach Page-Load)
+window.addEventListener("load", () => {
+  if (typeof google === "undefined") return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (resp.error) { setSyncStatus("Fehler: " + resp.error, false); return; }
+      gAccessToken = resp.access_token;
+      const email = await getGoogleEmail();
+      setSyncStatus("Verbunden", true, email);
+      document.getElementById("syncBtn").textContent = "Sync";
+      document.getElementById("syncBtn").onclick = syncAll;
+      await ensureSheets();
+      await loadFromSheets();
+    }
+  });
+});
+
+function toggleGoogleAuth() {
+  if (gAccessToken) { syncAll(); return; }
+  if (!tokenClient) { alert("Google-API noch nicht geladen – kurz warten und nochmal versuchen."); return; }
+  tokenClient.requestAccessToken({ prompt: "consent" });
+}
+
+function setSyncStatus(text, ok, sub="") {
+  document.getElementById("syncStatus").textContent = text;
+  document.getElementById("syncDot").style.background = ok ? "#27ae60" : (text.startsWith("Fehler") ? "#c0392b" : "#e6a817");
+  document.getElementById("syncUser").textContent = sub;
+}
+
+async function getGoogleEmail() {
+  try {
+    const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: "Bearer " + gAccessToken }
+    });
+    const d = await r.json();
+    return d.email || "";
+  } catch { return ""; }
+}
+
+async function sheetsReq(method, path, body) {
+  const base = "https://sheets.googleapis.com/v4/spreadsheets/" + SPREADSHEET_ID;
+  const resp = await fetch(base + path, {
+    method,
+    headers: {
+      Authorization: "Bearer " + gAccessToken,
+      "Content-Type": "application/json"
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!resp.ok) throw new Error("Sheets API " + resp.status + ": " + await resp.text());
+  return resp.json();
+}
+
+async function ensureSheets() {
+  // Prüft ob Sheets existieren, legt sie an falls nicht
+  try {
+    const meta = await sheetsReq("GET", "?fields=sheets.properties.title");
+    const existing = meta.sheets.map(s => s.properties.title);
+    const toAdd = [];
+    if (!existing.includes(SHEET_RG))  toAdd.push({ addSheet: { properties: { title: SHEET_RG } } });
+    if (!existing.includes(SHEET_ENV)) toAdd.push({ addSheet: { properties: { title: SHEET_ENV } } });
+    if (toAdd.length > 0) {
+      await sheetsReq("POST", ":batchUpdate", { requests: toAdd });
+    }
+    // Header-Zeilen setzen falls Sheet neu
+    const rgVals = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A1")}`);
+    if (!rgVals.values) {
+      await sheetsReq("PUT", `/values/${encodeURIComponent(SHEET_RG+"!A1:E1")}?valueInputOption=RAW`, {
+        values: [["Datum","Rechnungsnummer","Empfänger","Betreff","Betrag (€)"]]
+      });
+    }
+    const envVals = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_ENV+"!A1")}`);
+    if (!envVals.values) {
+      await sheetsReq("PUT", `/values/${encodeURIComponent(SHEET_ENV+"!A1:H1")}?valueInputOption=RAW`, {
+        values: [["Gespeichert am","RG-Nr","Empfänger","Betreff","Datum","Fällig","LZ-Von","LZ-Bis"]]
+      });
+    }
+    setSyncStatus("Sheets bereit", true);
+  } catch(e) {
+    setSyncStatus("Fehler: " + e.message, false);
+    throw e;
+  }
+}
+
+async function syncAll() {
+  if (!gAccessToken) { toggleGoogleAuth(); return; }
+  setSyncStatus("Synchronisiere...", null);
+  try {
+    await syncRechnungen();
+    await syncEntwurf();
+    setSyncStatus("Sync OK – " + new Date().toLocaleTimeString("de-DE"), true);
+  } catch(e) {
+    setSyncStatus("Sync Fehler: " + e.message, false);
+  }
+}
+
+async function syncRechnungen() {
+  // Bestehende Daten aus Sheet lesen
+  const existing = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
+  const rows = existing.values || [];
+  const existingNrs = rows.slice(1).map(r => r[1]||"");
+
+  // Neue Rechnungen aus localStorage
+  const local = JSON.parse(localStorage.getItem("dv_rechnungen")||"[]");
+  const toAppend = local.filter(r => !existingNrs.includes(r.nr));
+
+  if (toAppend.length > 0) {
+    await sheetsReq("POST", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      values: toAppend.map(r => [
+        r.datum ? r.datum.split("-").reverse().join(".") : "",
+        r.nr, r.empf||"", r.betreff||"",
+        r.betrag ? r.betrag.toFixed(2).replace(".",",") : "0,00"
+      ])
+    });
+  }
+
+  // Aus Sheet zurück in localStorage laden (Merge)
+  const updated = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
+  const allRows = (updated.values||[]).slice(1).filter(r=>r[1]);
+  const merged = allRows.map(r => ({
+    datum: r[0] ? r[0].split(".").reverse().join("-") : "",
+    nr: r[1]||"", empf: r[2]||"", betreff: r[3]||"",
+    betrag: parseFloat((r[4]||"0").replace(",",".")) || 0
+  }));
+  localStorage.setItem("dv_rechnungen", JSON.stringify(merged));
+}
+
+async function syncEntwurf() {
+  // Aktuellen Formularstand als Entwurf speichern
+  const now = new Date().toLocaleString("de-DE");
+  const row = [
+    now,
+    gv("rg_nr"), gv("e_name"), gv("betreff"),
+    gv("rg_dat"), gv("faellig"), gv("lz_von"), gv("lz_bis")
+  ];
+  await sheetsReq("POST", `/values/${encodeURIComponent(SHEET_ENV+"!A:H")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    values: [row]
+  });
+}
+
+async function loadFromSheets() {
+  // Beim Start: Rechnungen aus Sheets in localStorage laden
+  try {
+    const data = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
+    const rows = (data.values||[]).slice(1).filter(r=>r[1]);
+    if (rows.length > 0) {
+      const merged = rows.map(r => ({
+        datum: r[0] ? r[0].split(".").reverse().join("-") : "",
+        nr: r[1]||"", empf: r[2]||"", betreff: r[3]||"",
+        betrag: parseFloat((r[4]||"0").replace(",",".")) || 0
+      }));
+      localStorage.setItem("dv_rechnungen", JSON.stringify(merged));
+      setSyncStatus("Geladen: " + rows.length + " Rechnungen", true);
+    }
+  } catch(e) {
+    // Sheets noch leer oder Fehler - ignorieren
+  }
+}
+
+// Automatischer Sync nach "Merken"
+const _origSaveRechnung = saveRechnung;
+// Override saveRechnung um nach lokalem Speichern auch Sheets zu synchen
+function saveRechnungAndSync() {
+  // Manueller Inline-Save
+  const nr=gv("rg_nr"); if(!nr){alert("Rechnungsnummer fehlt.");return;}
+  const dat=gv("rg_dat"); if(!dat){alert("Rechnungsdatum fehlt.");return;}
+  const exists=rechnungen.findIndex(r=>r.nr===nr);
+  const entry={nr,datum:dat,empf:gv("e_name")||gv("e_str"),betreff:gv("betreff"),betrag:grand()};
+  if(exists>=0){rechnungen[exists]=entry;}else{rechnungen.push(entry);}
+  localStorage.setItem("dv_rechnungen",JSON.stringify(rechnungen));
+  // Sync wenn verbunden
+  if (gAccessToken) {
+    syncAll().then(() => alert("Rechnung " + nr + " gespeichert & mit Google Sheets synchronisiert."));
+  } else {
+    alert("Rechnung " + nr + " lokal gespeichert (" + rechnungen.length + " gesamt).\nNoch nicht mit Google Sheets verbunden.");
+  }
+}
+
+// ── PWA Service Worker
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     // SW als Blob registrieren (keine externe Datei nötig)
@@ -704,6 +934,217 @@ self.addEventListener('fetch',e=>e.respondWith(
       .catch(e=>console.log('SW Fehler:',e));
   });
 }
+
+function toggleMobileSidebar(){
+  const sb=document.querySelector('.sidebar');
+  sb.classList.toggle('mobile-open');
+}
+// ── GOOGLE SHEETS SYNC ──────────────────────────────────────
+const G_CLIENT_ID = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
+const G_SHEET_ID  = "102565a1J5fWhHmu0jnnNvwqiXM6Aje4f9QjqCdTk31A";
+const G_SCOPES    = "https://www.googleapis.com/auth/spreadsheets";
+const SHEET_RG    = "Rechnungen";
+const SHEET_ENT   = "Entw\u00fcrfe";
+
+let gToken = null;
+let gSignedIn = false;
+
+// Google Identity Services initialisieren
+function initGoogleAuth(){
+  if(typeof google === 'undefined'){
+    setTimeout(initGoogleAuth, 500);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: G_CLIENT_ID,
+    callback: handleGCredential,
+    auto_select: false,
+  });
+  // Prüfe ob Token im localStorage
+  const saved = localStorage.getItem('dv_gtoken');
+  if(saved){
+    try{
+      const t = JSON.parse(saved);
+      if(t.expires > Date.now()){
+        gToken = t.token;
+        gSignedIn = true;
+        setGStatus('ok','Verbunden mit Google');
+        document.getElementById('gsyncBtn').textContent = 'Synchronisieren';
+        document.getElementById('gsyncBtn').classList.add('connected');
+        document.getElementById('gsyncBtn').onclick = syncAll;
+      }
+    }catch(e){}
+  }
+}
+
+function gSignIn(){
+  // OAuth2 Popup via Token Client
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: G_CLIENT_ID,
+    scope: G_SCOPES,
+    callback: (resp) => {
+      if(resp.error){ setGStatus('err','Fehler: '+resp.error); return; }
+      gToken = resp.access_token;
+      gSignedIn = true;
+      // Token mit Ablaufzeit speichern (1h)
+      localStorage.setItem('dv_gtoken', JSON.stringify({
+        token: gToken,
+        expires: Date.now() + 3500*1000
+      }));
+      setGStatus('ok','Verbunden mit Google');
+      document.getElementById('gsyncBtn').textContent = 'Synchronisieren';
+      document.getElementById('gsyncBtn').classList.add('connected');
+      document.getElementById('gsyncBtn').onclick = syncAll;
+      // Sheets sofort initialisieren
+      initSheets();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function gSignOut(){
+  gToken = null; gSignedIn = false;
+  localStorage.removeItem('dv_gtoken');
+  setGStatus('','Nicht verbunden');
+  const btn = document.getElementById('gsyncBtn');
+  btn.textContent = 'Mit Google verbinden';
+  btn.classList.remove('connected');
+  btn.onclick = gSignIn;
+}
+
+function setGStatus(type, msg){
+  const s = document.getElementById('gsyncStatus');
+  s.textContent = msg;
+  s.className = 'status' + (type ? ' '+type : '');
+}
+
+async function sheetsRequest(method, path, body=null){
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + G_SHEET_ID + path;
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + gToken,
+      'Content-Type': 'application/json'
+    }
+  };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if(!r.ok){
+    const e = await r.json().catch(()=>({}));
+    if(r.status === 401){ gSignOut(); throw new Error('Token abgelaufen – bitte neu verbinden'); }
+    throw new Error(e.error?.message || 'Sheets API Fehler '+r.status);
+  }
+  return r.json();
+}
+
+async function initSheets(){
+  // Prüfe ob Sheets existieren, sonst anlegen
+  try{
+    const meta = await sheetsRequest('GET','?fields=sheets.properties.title');
+    const existing = meta.sheets.map(s=>s.properties.title);
+    const toAdd = [];
+    if(!existing.includes(SHEET_RG))  toAdd.push({addSheet:{properties:{title:SHEET_RG}}});
+    if(!existing.includes(SHEET_ENT)) toAdd.push({addSheet:{properties:{title:SHEET_ENT}}});
+    if(toAdd.length > 0){
+      await sheetsRequest('POST',':batchUpdate',{requests:toAdd});
+      // Header-Zeilen schreiben
+      if(!existing.includes(SHEET_RG)){
+        await sheetsRequest('PUT','/values/'+encodeURIComponent(SHEET_RG+'!A1:E1')+'?valueInputOption=RAW',{
+          values:[['Datum','Rechnungsnummer','Empf\u00e4nger','Betreff','Betrag (\u20ac)']]
+        });
+      }
+      if(!existing.includes(SHEET_ENT)){
+        await sheetsRequest('PUT','/values/'+encodeURIComponent(SHEET_ENT+'!A1:B1')+'?valueInputOption=RAW',{
+          values:[['Gespeichert am','Daten (JSON)']]
+        });
+      }
+    }
+    setGStatus('ok','Verbunden \u2713');
+  } catch(e){
+    setGStatus('err','Fehler: '+e.message);
+  }
+}
+
+async function syncAll(){
+  if(!gSignedIn){ alert('Bitte zuerst mit Google verbinden.'); return; }
+  setGStatus('loading','Synchronisiere...');
+  try{
+    await syncRechnungen();
+    await syncEntwurf();
+    setGStatus('ok','Synchronisiert \u2713 ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}));
+  } catch(e){
+    setGStatus('err','Fehler: '+e.message);
+  }
+}
+
+async function syncRechnungen(){
+  if(!rechnungen.length) return;
+  // Hole bestehende RG-Nummern aus Sheet
+  let existing = [];
+  try{
+    const r = await sheetsRequest('GET','/values/'+encodeURIComponent(SHEET_RG+'!B2:B'));
+    existing = (r.values||[]).map(row=>row[0]);
+  } catch(e){}
+  
+  // Nur neue Rechnungen anhängen (keine Duplikate)
+  const neu = rechnungen.filter(r=>!existing.includes(r.nr));
+  if(neu.length === 0) return;
+  
+  const rows = neu.map(r=>([
+    r.datum ? r.datum.split('-').reverse().join('.') : '',
+    r.nr, r.empf||'', r.betreff||'',
+    r.betrag.toFixed(2).replace('.',',')
+  ]));
+  
+  await sheetsRequest('POST','/values/'+encodeURIComponent(SHEET_RG+'!A:E')+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',{
+    values: rows
+  });
+}
+
+async function syncEntwurf(){
+  // Aktuellen Formularstand speichern
+  const entwurf = {
+    datum: new Date().toISOString(),
+    felder: {
+      e_name: gv('e_name'), e_str: gv('e_str'), e_plz: gv('e_plz'), e_ort: gv('e_ort'),
+      rg_nr: gv('rg_nr'), rg_dat: gv('rg_dat'), lz_von: gv('lz_von'), lz_bis: gv('lz_bis'),
+      faellig: gv('faellig'), betreff: gv('betreff'), auf_dat: gv('auf_dat')
+    },
+    positionen: positions
+  };
+  await sheetsRequest('POST','/values/'+encodeURIComponent(SHEET_ENT+'!A:B')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{
+    values:[[new Date().toLocaleString('de-DE'), JSON.stringify(entwurf)]]
+  });
+}
+
+async function ladeEntwurf(){
+  if(!gSignedIn){ alert('Bitte zuerst mit Google verbinden.'); return; }
+  setGStatus('loading','Lade letzten Entwurf...');
+  try{
+    const r = await sheetsRequest('GET','/values/'+encodeURIComponent(SHEET_ENT+'!A:B'));
+    const rows = r.values||[];
+    if(rows.length < 2){ setGStatus('ok','Kein Entwurf gefunden'); return; }
+    // Letzten Eintrag laden
+    const last = rows[rows.length-1];
+    const data = JSON.parse(last[1]);
+    // Felder befüllen
+    Object.entries(data.felder||{}).forEach(([id,val])=>{
+      const el = document.getElementById(id);
+      if(el) el.value = val;
+    });
+    if(data.positionen) positions = data.positionen;
+    renderPos(); upd();
+    setGStatus('ok','Entwurf geladen \u2713');
+  } catch(e){
+    setGStatus('err','Fehler: '+e.message);
+  }
+}
+
+// Beim Start initialisieren
+window.addEventListener('load', ()=>setTimeout(initGoogleAuth, 800));
+
+// saveRechnung auch zu Sheets synchronisieren
+const _origSaveRechnung = saveRechnung;
 
 let previewVisible=true;
 function togglePreview(){
