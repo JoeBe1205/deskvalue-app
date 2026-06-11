@@ -93,10 +93,33 @@ select{cursor:pointer}
 .dl-btn:disabled{background:#888;cursor:not-allowed}
 .hint{font-size:10.5px;color:#888;line-height:1.5}
 .hint b{color:#aaa}
+
+/* ── RESPONSIVE: Handy/Tablet ── */
+@media (max-width: 820px){
+  .app{grid-template-columns:1fr}
+  .form{padding:16px 16px 90px 16px}
+  .sidebar{position:static;height:auto;width:100%;background:#222;padding:16px}
+  /* Mobile-Tabs zum Umschalten */
+  .mtabs{display:flex;gap:0;position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--bdr);margin:-16px -16px 16px -16px}
+  .mtab{flex:1;padding:13px;text-align:center;font-size:13px;font-weight:700;color:#888;background:#fafaf8;border:none;cursor:pointer;font-family:Arial,sans-serif}
+  .mtab.active{color:var(--red);background:#fff;border-bottom:2px solid var(--red)}
+  /* Im Mobile-Modus: nur aktiver Bereich sichtbar */
+  body.show-preview .form{display:none}
+  body.show-preview .sidebar{display:flex}
+  body.show-form .sidebar{display:none}
+  body.show-form .form{display:block}
+}
+@media (min-width: 821px){
+  .mtabs{display:none}
+}
 </style>
 </head>
 <body>
 <div class="app">
+<div class="mtabs">
+  <button class="mtab active" id="mtabForm" onclick="mShow('form')">Rechnung</button>
+  <button class="mtab" id="mtabPrev" onclick="mShow('preview')">Vorschau</button>
+</div>
 <div class="form">
   <div class="apphead">
     <div class="brand">Desk<span>Value</span></div>
@@ -291,6 +314,7 @@ const PLZ_ORTE = {"33098":"Paderborn","33100":"Paderborn","33102":"Paderborn","3
 let positions = [{desc:"",detail:"",unit:"pau.",qty:"1",price:""}];
 
 document.addEventListener("DOMContentLoaded",()=>{
+  document.body.classList.add('show-form');
   const t=new Date().toISOString().split("T")[0];
   const d=new Date(Date.now()+14*864e5).toISOString().split("T")[0];
   document.getElementById("rg_dat").value=t;
@@ -546,6 +570,12 @@ function plzLookup(){
 }
 function ortManual(){
   document.getElementById("e_ort").dataset.auto = "0";
+}
+function mShow(which){
+  document.body.classList.remove('show-form','show-preview');
+  document.body.classList.add(which==='preview'?'show-preview':'show-form');
+  document.getElementById('mtabForm').classList.toggle('active', which==='form');
+  document.getElementById('mtabPrev').classList.toggle('active', which==='preview');
 }
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():"";}
 function xe(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
