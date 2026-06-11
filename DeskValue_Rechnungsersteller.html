@@ -13,7 +13,6 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -24,13 +23,6 @@ body{font-family:Arial,sans-serif;background:var(--bg);color:var(--txt);min-heig
 .app{display:grid;grid-template-columns:1fr 370px;min-height:100vh}
 .form{padding:28px 36px;overflow-y:auto}
 .sidebar{background:#222;padding:20px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .3s}
-@media(max-width:768px){
-  .app{grid-template-columns:1fr}
-  .form{padding:16px}
-  .sidebar{position:fixed;bottom:0;left:0;right:0;height:auto;max-height:50vh;top:auto;z-index:100;border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .3s}
-  .sidebar.mobile-open{transform:translateY(0)}
-  .mobile-preview-btn{display:flex!important}
-}
 
 .apphead{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .brand{font-size:19px;font-weight:700;letter-spacing:-.3px}
@@ -101,26 +93,12 @@ select{cursor:pointer}
 .dl-btn:disabled{background:#888;cursor:not-allowed}
 .hint{font-size:10.5px;color:#888;line-height:1.5}
 .hint b{color:#aaa}
-.gsync-bar{display:flex;align-items:center;gap:10px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:12px}
-.gsync-bar .status{flex:1;color:#888}
-.gsync-bar .status.ok{color:#27ae60}
-.gsync-bar .status.err{color:#c0392b}
-.gsync-bar .status.loading{color:#e6a817}
-.gsync-btn{background:none;border:1px solid #444;color:#aaa;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:Arial,sans-serif;white-space:nowrap;transition:all .15s}
-.gsync-btn:hover{border-color:#c0392b;color:#c0392b}
-.gsync-btn.connected{border-color:#27ae60;color:#27ae60}
 </style>
 </head>
 <body>
 <div class="app">
 <div class="form">
-  <div style="display:none;position:fixed;bottom:20px;right:20px;z-index:99" class="mobile-preview-btn" id="mobilePreviewBtn">
-  <button onclick="toggleMobileSidebar()" style="background:#c0392b;color:#fff;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;font-family:Arial,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;gap:8px">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-    Vorschau &amp; Export
-  </button>
-</div>
-<div class="apphead">
+  <div class="apphead">
     <div class="brand">Desk<span>Value</span></div>
     <div class="pill">Rechnungsersteller</div>
   </div>
@@ -131,8 +109,8 @@ select{cursor:pointer}
       <div class="field"><label>Firma / Name</label><input id="e_name" placeholder="Musterfirma GmbH" oninput="upd()"></div>
       <div class="field"><label>Straße &amp; Hausnummer</label><input id="e_str" placeholder="Musterstraße 1" oninput="upd()"></div>
       <div class="g2" style="margin-top:12px">
-        <div class="field"><label>PLZ</label><input id="e_plz" placeholder="33100" oninput="upd()"></div>
-        <div class="field"><label>Ort</label><input id="e_ort" placeholder="Paderborn" oninput="upd()"></div>
+        <div class="field"><label>PLZ</label><input id="e_plz" placeholder="33100" maxlength="5" oninput="plzLookup();upd()"></div>
+        <div class="field"><label>Ort</label><input id="e_ort" placeholder="Paderborn" oninput="ortManual();upd()"></div>
       </div>
     </div>
   </div>
@@ -182,14 +160,15 @@ select{cursor:pointer}
 </div>
 
 <div class="sidebar">
-  <!-- Google Sheets Sync Bar -->
-  <div class="gsync-bar" id="gsyncBar">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
-    <span class="status" id="gsyncStatus">Nicht verbunden</span>
-    <button class="gsync-btn" id="gsyncBtn" onclick="gSignIn()">Google</button>
+  <div id="gSyncBar" style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <div id="gDot" style="width:8px;height:8px;border-radius:50%;background:#666;flex-shrink:0"></div>
+    <div style="flex:1;min-width:0">
+      <div id="gStatus" style="font-size:11px;color:#aaa">Nicht verbunden</div>
+      <div id="gUser" style="font-size:10px;color:#666;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+    </div>
+    <button id="gBtn" onclick="gSignIn()" style="background:#2a6496;color:#fff;border:none;border-radius:4px;padding:5px 11px;font-size:11px;font-family:Arial,sans-serif;cursor:pointer;flex-shrink:0;white-space:nowrap">Mit Google verbinden</button>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between">
-  <button onclick="toggleMobileSidebar()" class="mobile-preview-btn" style="display:none;background:none;border:none;color:#888;font-size:22px;cursor:pointer;line-height:1;padding:0">&#215;</button>
     <div class="prev-label">Vorschau</div>
     <button id="toggleBtn" onclick="togglePreview()" style="background:none;border:1px solid #444;color:#888;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:Arial,sans-serif;transition:all .15s" onmouseover="this.style.borderColor='#c0392b';this.style.color='#c0392b'" onmouseout="this.style.borderColor='#444';this.style.color='#888'">Ausblenden</button>
   </div>
@@ -218,21 +197,11 @@ select{cursor:pointer}
     </svg>
     Rechnung als .docx
   </button>
-  <button class="dl-btn" onclick="saveRechnungAndSync()" style="background:#27ae60;margin-top:-6px">
+  <button class="dl-btn" onclick="saveRechnung()" style="background:#27ae60;margin-top:-6px">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     + Für EÜR merken
   </button>
   <p class="hint"><b>Tipp:</b> In Word &#246;ffnen &#8594; Datei &#8594; Als PDF exportieren.</p>
-  <div style="display:flex;gap:6px">
-    <button class="dl-btn" onclick="syncAll()" style="background:#1a7340;flex:1;font-size:12px;padding:9px 6px">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      Sync
-    </button>
-    <button class="dl-btn" onclick="ladeEntwurf()" style="background:#555;flex:1;font-size:12px;padding:9px 6px">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-      Laden
-    </button>
-  </div>
   <hr style="border:none;border-top:1px solid #333;margin:4px 0">
   <button class="dl-btn" id="euerbtn" onclick="showEuer()" style="background:#2a6496">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
@@ -316,6 +285,8 @@ const PRESETS = [
   {label:"Vor-/Nachbereitung Termin",                     unit:"Std.", qty:"",    price:""},
   {label:"Sonstiges",                                     unit:"pau.", qty:"1",   price:""},
 ];
+
+const PLZ_ORTE = {"33098":"Paderborn","33100":"Paderborn","33102":"Paderborn","33104":"Paderborn","33106":"Paderborn","33689":"Bielefeld","33034":"Brakel","33039":"Nieheim","33129":"Delbrück","33142":"Büren","33154":"Salzkotten","33161":"Hövelhof","33165":"Lichtenau","33175":"Bad Lippspringe","33178":"Borchen","33181":"Bad Wünnenberg","33184":"Altenbeken","33189":"Schlangen","33330":"Gütersloh","33332":"Gütersloh","33333":"Gütersloh","33334":"Gütersloh","33335":"Gütersloh","33378":"Rheda-Wiedenbrück","33397":"Rietberg","33415":"Verl","33428":"Harsewinkel","33442":"Herzebrock-Clarholz","33449":"Langenberg","33602":"Bielefeld","33611":"Bielefeld","33617":"Bielefeld","33619":"Bielefeld","33647":"Bielefeld","33649":"Bielefeld","33659":"Bielefeld","33604":"Bielefeld","33605":"Bielefeld","33607":"Bielefeld","33609":"Bielefeld","33613":"Bielefeld","33615":"Bielefeld","33699":"Bielefeld","33719":"Bielefeld","33729":"Bielefeld","33739":"Bielefeld","33790":"Halle (Westf.)","33803":"Steinhagen","33813":"Oerlinghausen","33818":"Leopoldshöhe","33824":"Werther (Westf.)","33829":"Borgholzhausen","37671":"Höxter","37688":"Beverungen","37696":"Marienmünster","34434":"Borgentreich","37697":"Lauenförde","32049":"Herford","32051":"Herford","32052":"Herford","32105":"Bad Salzuflen","32107":"Bad Salzuflen","32108":"Bad Salzuflen","32120":"Hiddenhausen","32130":"Enger","32139":"Spenge","32257":"Bünde","32278":"Kirchlengern","32289":"Rödinghausen","32584":"Löhne","32756":"Detmold","32758":"Detmold","32760":"Detmold","32791":"Lage","32805":"Horn-Bad Meinberg","32816":"Schieder-Schwalenberg","32825":"Blomberg","32832":"Augustdorf","32839":"Steinheim","32657":"Lemgo","32676":"Lügde","32689":"Kalletal","32694":"Dörentrup","32699":"Extertal","32547":"Bad Oeynhausen","32423":"Minden","32425":"Minden","32427":"Minden","32429":"Minden","32457":"Porta Westfalica","32469":"Petershagen","32479":"Hille","32312":"Lübbecke","32339":"Espelkamp","32351":"Stemwede","32361":"Pr. Oldendorf","32369":"Rahden","32549":"Bad Oeynhausen","44135":"Dortmund","44137":"Dortmund","44139":"Dortmund","44787":"Bochum","45127":"Essen","40213":"Düsseldorf","40215":"Düsseldorf","50667":"Köln","50668":"Köln","48143":"Münster","48149":"Münster","59065":"Hamm","59555":"Lippstadt","59557":"Lippstadt","33758":"Schloß Holte-Stukenbrock","59590":"Geseke","59597":"Erwitte","34414":"Warburg","52222":"Stolberg (Rheinland)","52223":"Stolberg (Rheinland)","52224":"Stolberg (Rheinland)","52062":"Aachen","52064":"Aachen","52066":"Aachen","52070":"Aachen","52074":"Aachen"};
 
 let positions = [{desc:"",detail:"",unit:"pau.",qty:"1",price:""}];
 
@@ -563,6 +534,19 @@ ${pp(ar("DeskValue – Bürodienstleistungen & Immobilienbewertung",false,16,"55
 }
 
 // UTILS
+function plzLookup(){
+  const plz = gv("e_plz");
+  const ortFeld = document.getElementById("e_ort");
+  if(plz.length===5 && PLZ_ORTE[plz]){
+    if(!ortFeld.value || ortFeld.dataset.auto==="1"){
+      ortFeld.value = PLZ_ORTE[plz];
+      ortFeld.dataset.auto = "1";
+    }
+  }
+}
+function ortManual(){
+  document.getElementById("e_ort").dataset.auto = "0";
+}
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():"";}
 function xe(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function xe2(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
@@ -584,7 +568,11 @@ function saveRechnung(){
   };
   if(exists>=0){rechnungen[exists]=entry;}else{rechnungen.push(entry);}
   localStorage.setItem('dv_rechnungen',JSON.stringify(rechnungen));
-  alert("Rechnung "+nr+" gespeichert ("+rechnungen.length+" gesamt).");
+  if(typeof gToken !== "undefined" && gToken){
+    gSyncAll().then(()=>alert("Rechnung "+nr+" gespeichert & mit Google synchronisiert."));
+  } else {
+    alert("Rechnung "+nr+" gespeichert ("+rechnungen.length+" gesamt). Noch nicht mit Google verbunden.");
+  }
 }
 
 function showEuer(){
@@ -716,194 +704,188 @@ function exportEuer(){
 }
 
 // ── GOOGLE SHEETS SYNC ──────────────────────────────────────
-const SPREADSHEET_ID = "102565a1J5fWhHmu0jnnNvwqiXM6Aje4f9QjqCdTk31A";
-const CLIENT_ID      = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
-const SCOPES         = "https://www.googleapis.com/auth/spreadsheets";
-const SHEET_RG       = "Rechnungen";
-const SHEET_ENV      = "Entwürfe";
+const G_CLIENT_ID = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
+const G_SHEET_ID  = "102565a1J5fWhHmu0jnnNvwqiXM6Aje4f9QjqCdTk31A";
+const G_SCOPES    = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email";
+const G_SHEET_RG  = "Rechnungen";
+const G_SHEET_ENT = "Entwuerfe";
 
-let gAccessToken = null;
-let tokenClient  = null;
+let gToken = null;
+let gTokenClient = null;
 
-// GIS initialisieren (nach Page-Load)
-window.addEventListener("load", () => {
-  if (typeof google === "undefined") return;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
+function gInit(){
+  if(typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
+    setTimeout(gInit, 400);
+    return;
+  }
+  gTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: G_CLIENT_ID,
+    scope: G_SCOPES,
     callback: async (resp) => {
-      if (resp.error) { setSyncStatus("Fehler: " + resp.error, false); return; }
-      gAccessToken = resp.access_token;
-      const email = await getGoogleEmail();
-      setSyncStatus("Verbunden", true, email);
-      document.getElementById("syncBtn").textContent = "Sync";
-      document.getElementById("syncBtn").onclick = syncAll;
-      await ensureSheets();
-      await loadFromSheets();
+      if(resp.error){ gSetStatus("err","Fehler: "+resp.error); return; }
+      gToken = resp.access_token;
+      localStorage.setItem("dv_gtoken", JSON.stringify({token:gToken, exp:Date.now()+3500*1000}));
+      const email = await gGetEmail();
+      gSetStatus("ok","Verbunden", email);
+      gAfterConnect();
     }
   });
-});
-
-function toggleGoogleAuth() {
-  if (gAccessToken) { syncAll(); return; }
-  if (!tokenClient) { alert("Google-API noch nicht geladen – kurz warten und nochmal versuchen."); return; }
-  tokenClient.requestAccessToken({ prompt: "consent" });
+  // Gespeichertes Token wiederverwenden
+  const saved = localStorage.getItem("dv_gtoken");
+  if(saved){
+    try{
+      const t = JSON.parse(saved);
+      if(t.exp > Date.now()){
+        gToken = t.token;
+        gGetEmail().then(email => {
+          gSetStatus("ok","Verbunden", email);
+          gAfterConnect();
+        });
+      }
+    }catch(e){}
+  }
 }
 
-function setSyncStatus(text, ok, sub="") {
-  document.getElementById("syncStatus").textContent = text;
-  document.getElementById("syncDot").style.background = ok ? "#27ae60" : (text.startsWith("Fehler") ? "#c0392b" : "#e6a817");
-  document.getElementById("syncUser").textContent = sub;
+function gSignIn(){
+  if(gToken){ gSyncAll(); return; }
+  if(!gTokenClient){ alert("Google-API lädt noch – bitte 2 Sekunden warten und erneut klicken."); return; }
+  gTokenClient.requestAccessToken({prompt:"consent"});
 }
 
-async function getGoogleEmail() {
-  try {
-    const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: "Bearer " + gAccessToken }
+function gAfterConnect(){
+  const btn = document.getElementById("gBtn");
+  btn.textContent = "Jetzt synchronisieren";
+  btn.onclick = gSyncAll;
+  gEnsureSheets().then(()=>gLoadRechnungen());
+}
+
+function gSetStatus(type, msg, sub){
+  const dot = document.getElementById("gDot");
+  document.getElementById("gStatus").textContent = msg;
+  document.getElementById("gUser").textContent = sub || "";
+  dot.style.background = type==="ok" ? "#27ae60" : type==="err" ? "#c0392b" : type==="load" ? "#e6a817" : "#666";
+}
+
+async function gGetEmail(){
+  try{
+    const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo",{
+      headers:{Authorization:"Bearer "+gToken}
     });
     const d = await r.json();
     return d.email || "";
-  } catch { return ""; }
+  }catch(e){ return ""; }
 }
 
-async function sheetsReq(method, path, body) {
-  const base = "https://sheets.googleapis.com/v4/spreadsheets/" + SPREADSHEET_ID;
-  const resp = await fetch(base + path, {
+async function gReq(method, path, body){
+  const url = "https://sheets.googleapis.com/v4/spreadsheets/" + G_SHEET_ID + path;
+  const opts = {
     method,
-    headers: {
-      Authorization: "Bearer " + gAccessToken,
-      "Content-Type": "application/json"
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (!resp.ok) throw new Error("Sheets API " + resp.status + ": " + await resp.text());
-  return resp.json();
+    headers:{Authorization:"Bearer "+gToken, "Content-Type":"application/json"}
+  };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if(!r.ok){
+    if(r.status===401){
+      gToken=null; localStorage.removeItem("dv_gtoken");
+      gSetStatus("err","Sitzung abgelaufen – neu verbinden");
+      const b=document.getElementById("gBtn"); b.textContent="Mit Google verbinden"; b.onclick=gSignIn;
+    }
+    const e = await r.json().catch(()=>({}));
+    throw new Error(e.error && e.error.message ? e.error.message : "Sheets API "+r.status);
+  }
+  return r.json();
 }
 
-async function ensureSheets() {
-  // Prüft ob Sheets existieren, legt sie an falls nicht
-  try {
-    const meta = await sheetsReq("GET", "?fields=sheets.properties.title");
-    const existing = meta.sheets.map(s => s.properties.title);
-    const toAdd = [];
-    if (!existing.includes(SHEET_RG))  toAdd.push({ addSheet: { properties: { title: SHEET_RG } } });
-    if (!existing.includes(SHEET_ENV)) toAdd.push({ addSheet: { properties: { title: SHEET_ENV } } });
-    if (toAdd.length > 0) {
-      await sheetsReq("POST", ":batchUpdate", { requests: toAdd });
-    }
-    // Header-Zeilen setzen falls Sheet neu
-    const rgVals = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A1")}`);
-    if (!rgVals.values) {
-      await sheetsReq("PUT", `/values/${encodeURIComponent(SHEET_RG+"!A1:E1")}?valueInputOption=RAW`, {
-        values: [["Datum","Rechnungsnummer","Empfänger","Betreff","Betrag (€)"]]
+async function gEnsureSheets(){
+  try{
+    const meta = await gReq("GET","?fields=sheets.properties.title");
+    const have = meta.sheets.map(s=>s.properties.title);
+    const add = [];
+    if(!have.includes(G_SHEET_RG))  add.push({addSheet:{properties:{title:G_SHEET_RG}}});
+    if(!have.includes(G_SHEET_ENT)) add.push({addSheet:{properties:{title:G_SHEET_ENT}}});
+    if(add.length) await gReq("POST",":batchUpdate",{requests:add});
+
+    const rg1 = await gReq("GET","/values/"+encodeURIComponent(G_SHEET_RG+"!A1"));
+    if(!rg1.values){
+      await gReq("PUT","/values/"+encodeURIComponent(G_SHEET_RG+"!A1:E1")+"?valueInputOption=RAW",{
+        values:[["Datum","Rechnungsnummer","Empfaenger","Betreff","Betrag (Euro)"]]
       });
     }
-    const envVals = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_ENV+"!A1")}`);
-    if (!envVals.values) {
-      await sheetsReq("PUT", `/values/${encodeURIComponent(SHEET_ENV+"!A1:H1")}?valueInputOption=RAW`, {
-        values: [["Gespeichert am","RG-Nr","Empfänger","Betreff","Datum","Fällig","LZ-Von","LZ-Bis"]]
+    const en1 = await gReq("GET","/values/"+encodeURIComponent(G_SHEET_ENT+"!A1"));
+    if(!en1.values){
+      await gReq("PUT","/values/"+encodeURIComponent(G_SHEET_ENT+"!A1:B1")+"?valueInputOption=RAW",{
+        values:[["Gespeichert am","Daten (JSON)"]]
       });
     }
-    setSyncStatus("Sheets bereit", true);
-  } catch(e) {
-    setSyncStatus("Fehler: " + e.message, false);
+  }catch(e){
+    gSetStatus("err","Fehler: "+e.message);
     throw e;
   }
 }
 
-async function syncAll() {
-  if (!gAccessToken) { toggleGoogleAuth(); return; }
-  setSyncStatus("Synchronisiere...", null);
-  try {
-    await syncRechnungen();
-    await syncEntwurf();
-    setSyncStatus("Sync OK – " + new Date().toLocaleTimeString("de-DE"), true);
-  } catch(e) {
-    setSyncStatus("Sync Fehler: " + e.message, false);
+async function gSyncAll(){
+  if(!gToken){ gSignIn(); return; }
+  gSetStatus("load","Synchronisiere...");
+  try{
+    await gEnsureSheets();
+    await gPushRechnungen();
+    await gSaveEntwurf();
+    await gLoadRechnungen();
+    gSetStatus("ok","Synchronisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}));
+  }catch(e){
+    gSetStatus("err","Fehler: "+e.message);
   }
 }
 
-async function syncRechnungen() {
-  // Bestehende Daten aus Sheet lesen
-  const existing = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
-  const rows = existing.values || [];
-  const existingNrs = rows.slice(1).map(r => r[1]||"");
-
-  // Neue Rechnungen aus localStorage
+async function gPushRechnungen(){
   const local = JSON.parse(localStorage.getItem("dv_rechnungen")||"[]");
-  const toAppend = local.filter(r => !existingNrs.includes(r.nr));
-
-  if (toAppend.length > 0) {
-    await sheetsReq("POST", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
-      values: toAppend.map(r => [
-        r.datum ? r.datum.split("-").reverse().join(".") : "",
-        r.nr, r.empf||"", r.betreff||"",
-        r.betrag ? r.betrag.toFixed(2).replace(".",",") : "0,00"
-      ])
-    });
-  }
-
-  // Aus Sheet zurück in localStorage laden (Merge)
-  const updated = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
-  const allRows = (updated.values||[]).slice(1).filter(r=>r[1]);
-  const merged = allRows.map(r => ({
-    datum: r[0] ? r[0].split(".").reverse().join("-") : "",
-    nr: r[1]||"", empf: r[2]||"", betreff: r[3]||"",
-    betrag: parseFloat((r[4]||"0").replace(",",".")) || 0
-  }));
-  localStorage.setItem("dv_rechnungen", JSON.stringify(merged));
+  if(!local.length) return;
+  let existing = [];
+  try{
+    const r = await gReq("GET","/values/"+encodeURIComponent(G_SHEET_RG+"!B2:B"));
+    existing = (r.values||[]).map(row=>row[0]);
+  }catch(e){}
+  const neu = local.filter(r=>!existing.includes(r.nr));
+  if(!neu.length) return;
+  const rows = neu.map(r=>[
+    r.datum ? r.datum.split("-").reverse().join(".") : "",
+    r.nr, r.empf||"", r.betreff||"",
+    (r.betrag||0).toFixed(2).replace(".",",")
+  ]);
+  await gReq("POST","/values/"+encodeURIComponent(G_SHEET_RG+"!A:E")+":append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS",{values:rows});
 }
 
-async function syncEntwurf() {
-  // Aktuellen Formularstand als Entwurf speichern
-  const now = new Date().toLocaleString("de-DE");
-  const row = [
-    now,
-    gv("rg_nr"), gv("e_name"), gv("betreff"),
-    gv("rg_dat"), gv("faellig"), gv("lz_von"), gv("lz_bis")
-  ];
-  await sheetsReq("POST", `/values/${encodeURIComponent(SHEET_ENV+"!A:H")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
-    values: [row]
+async function gLoadRechnungen(){
+  try{
+    const r = await gReq("GET","/values/"+encodeURIComponent(G_SHEET_RG+"!A:E"));
+    const rows = (r.values||[]).slice(1).filter(x=>x[1]);
+    if(rows.length){
+      const merged = rows.map(x=>({
+        datum: x[0] ? x[0].split(".").reverse().join("-") : "",
+        nr:x[1]||"", empf:x[2]||"", betreff:x[3]||"",
+        betrag: parseFloat((x[4]||"0").replace(",",".")) || 0
+      }));
+      localStorage.setItem("dv_rechnungen", JSON.stringify(merged));
+      rechnungen = merged;
+    }
+  }catch(e){}
+}
+
+async function gSaveEntwurf(){
+  const entwurf = {
+    felder:{
+      e_name:gv("e_name"), e_str:gv("e_str"), e_plz:gv("e_plz"), e_ort:gv("e_ort"),
+      rg_nr:gv("rg_nr"), rg_dat:gv("rg_dat"), lz_von:gv("lz_von"), lz_bis:gv("lz_bis"),
+      faellig:gv("faellig"), betreff:gv("betreff"), auf_dat:gv("auf_dat")
+    },
+    positionen: positions
+  };
+  await gReq("POST","/values/"+encodeURIComponent(G_SHEET_ENT+"!A:B")+":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{
+    values:[[new Date().toLocaleString("de-DE"), JSON.stringify(entwurf)]]
   });
 }
 
-async function loadFromSheets() {
-  // Beim Start: Rechnungen aus Sheets in localStorage laden
-  try {
-    const data = await sheetsReq("GET", `/values/${encodeURIComponent(SHEET_RG+"!A:E")}`);
-    const rows = (data.values||[]).slice(1).filter(r=>r[1]);
-    if (rows.length > 0) {
-      const merged = rows.map(r => ({
-        datum: r[0] ? r[0].split(".").reverse().join("-") : "",
-        nr: r[1]||"", empf: r[2]||"", betreff: r[3]||"",
-        betrag: parseFloat((r[4]||"0").replace(",",".")) || 0
-      }));
-      localStorage.setItem("dv_rechnungen", JSON.stringify(merged));
-      setSyncStatus("Geladen: " + rows.length + " Rechnungen", true);
-    }
-  } catch(e) {
-    // Sheets noch leer oder Fehler - ignorieren
-  }
-}
-
-// Automatischer Sync nach "Merken"
-const _origSaveRechnung = saveRechnung;
-// Override saveRechnung um nach lokalem Speichern auch Sheets zu synchen
-function saveRechnungAndSync() {
-  // Manueller Inline-Save
-  const nr=gv("rg_nr"); if(!nr){alert("Rechnungsnummer fehlt.");return;}
-  const dat=gv("rg_dat"); if(!dat){alert("Rechnungsdatum fehlt.");return;}
-  const exists=rechnungen.findIndex(r=>r.nr===nr);
-  const entry={nr,datum:dat,empf:gv("e_name")||gv("e_str"),betreff:gv("betreff"),betrag:grand()};
-  if(exists>=0){rechnungen[exists]=entry;}else{rechnungen.push(entry);}
-  localStorage.setItem("dv_rechnungen",JSON.stringify(rechnungen));
-  // Sync wenn verbunden
-  if (gAccessToken) {
-    syncAll().then(() => alert("Rechnung " + nr + " gespeichert & mit Google Sheets synchronisiert."));
-  } else {
-    alert("Rechnung " + nr + " lokal gespeichert (" + rechnungen.length + " gesamt).\nNoch nicht mit Google Sheets verbunden.");
-  }
-}
+window.addEventListener("load", ()=>setTimeout(gInit, 600));
 
 // ── PWA Service Worker
 if('serviceWorker' in navigator){
@@ -934,217 +916,6 @@ self.addEventListener('fetch',e=>e.respondWith(
       .catch(e=>console.log('SW Fehler:',e));
   });
 }
-
-function toggleMobileSidebar(){
-  const sb=document.querySelector('.sidebar');
-  sb.classList.toggle('mobile-open');
-}
-// ── GOOGLE SHEETS SYNC ──────────────────────────────────────
-const G_CLIENT_ID = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
-const G_SHEET_ID  = "102565a1J5fWhHmu0jnnNvwqiXM6Aje4f9QjqCdTk31A";
-const G_SCOPES    = "https://www.googleapis.com/auth/spreadsheets";
-const SHEET_RG    = "Rechnungen";
-const SHEET_ENT   = "Entw\u00fcrfe";
-
-let gToken = null;
-let gSignedIn = false;
-
-// Google Identity Services initialisieren
-function initGoogleAuth(){
-  if(typeof google === 'undefined'){
-    setTimeout(initGoogleAuth, 500);
-    return;
-  }
-  google.accounts.id.initialize({
-    client_id: G_CLIENT_ID,
-    callback: handleGCredential,
-    auto_select: false,
-  });
-  // Prüfe ob Token im localStorage
-  const saved = localStorage.getItem('dv_gtoken');
-  if(saved){
-    try{
-      const t = JSON.parse(saved);
-      if(t.expires > Date.now()){
-        gToken = t.token;
-        gSignedIn = true;
-        setGStatus('ok','Verbunden mit Google');
-        document.getElementById('gsyncBtn').textContent = 'Synchronisieren';
-        document.getElementById('gsyncBtn').classList.add('connected');
-        document.getElementById('gsyncBtn').onclick = syncAll;
-      }
-    }catch(e){}
-  }
-}
-
-function gSignIn(){
-  // OAuth2 Popup via Token Client
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: G_CLIENT_ID,
-    scope: G_SCOPES,
-    callback: (resp) => {
-      if(resp.error){ setGStatus('err','Fehler: '+resp.error); return; }
-      gToken = resp.access_token;
-      gSignedIn = true;
-      // Token mit Ablaufzeit speichern (1h)
-      localStorage.setItem('dv_gtoken', JSON.stringify({
-        token: gToken,
-        expires: Date.now() + 3500*1000
-      }));
-      setGStatus('ok','Verbunden mit Google');
-      document.getElementById('gsyncBtn').textContent = 'Synchronisieren';
-      document.getElementById('gsyncBtn').classList.add('connected');
-      document.getElementById('gsyncBtn').onclick = syncAll;
-      // Sheets sofort initialisieren
-      initSheets();
-    }
-  });
-  client.requestAccessToken();
-}
-
-function gSignOut(){
-  gToken = null; gSignedIn = false;
-  localStorage.removeItem('dv_gtoken');
-  setGStatus('','Nicht verbunden');
-  const btn = document.getElementById('gsyncBtn');
-  btn.textContent = 'Mit Google verbinden';
-  btn.classList.remove('connected');
-  btn.onclick = gSignIn;
-}
-
-function setGStatus(type, msg){
-  const s = document.getElementById('gsyncStatus');
-  s.textContent = msg;
-  s.className = 'status' + (type ? ' '+type : '');
-}
-
-async function sheetsRequest(method, path, body=null){
-  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + G_SHEET_ID + path;
-  const opts = {
-    method,
-    headers: {
-      'Authorization': 'Bearer ' + gToken,
-      'Content-Type': 'application/json'
-    }
-  };
-  if(body) opts.body = JSON.stringify(body);
-  const r = await fetch(url, opts);
-  if(!r.ok){
-    const e = await r.json().catch(()=>({}));
-    if(r.status === 401){ gSignOut(); throw new Error('Token abgelaufen – bitte neu verbinden'); }
-    throw new Error(e.error?.message || 'Sheets API Fehler '+r.status);
-  }
-  return r.json();
-}
-
-async function initSheets(){
-  // Prüfe ob Sheets existieren, sonst anlegen
-  try{
-    const meta = await sheetsRequest('GET','?fields=sheets.properties.title');
-    const existing = meta.sheets.map(s=>s.properties.title);
-    const toAdd = [];
-    if(!existing.includes(SHEET_RG))  toAdd.push({addSheet:{properties:{title:SHEET_RG}}});
-    if(!existing.includes(SHEET_ENT)) toAdd.push({addSheet:{properties:{title:SHEET_ENT}}});
-    if(toAdd.length > 0){
-      await sheetsRequest('POST',':batchUpdate',{requests:toAdd});
-      // Header-Zeilen schreiben
-      if(!existing.includes(SHEET_RG)){
-        await sheetsRequest('PUT','/values/'+encodeURIComponent(SHEET_RG+'!A1:E1')+'?valueInputOption=RAW',{
-          values:[['Datum','Rechnungsnummer','Empf\u00e4nger','Betreff','Betrag (\u20ac)']]
-        });
-      }
-      if(!existing.includes(SHEET_ENT)){
-        await sheetsRequest('PUT','/values/'+encodeURIComponent(SHEET_ENT+'!A1:B1')+'?valueInputOption=RAW',{
-          values:[['Gespeichert am','Daten (JSON)']]
-        });
-      }
-    }
-    setGStatus('ok','Verbunden \u2713');
-  } catch(e){
-    setGStatus('err','Fehler: '+e.message);
-  }
-}
-
-async function syncAll(){
-  if(!gSignedIn){ alert('Bitte zuerst mit Google verbinden.'); return; }
-  setGStatus('loading','Synchronisiere...');
-  try{
-    await syncRechnungen();
-    await syncEntwurf();
-    setGStatus('ok','Synchronisiert \u2713 ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}));
-  } catch(e){
-    setGStatus('err','Fehler: '+e.message);
-  }
-}
-
-async function syncRechnungen(){
-  if(!rechnungen.length) return;
-  // Hole bestehende RG-Nummern aus Sheet
-  let existing = [];
-  try{
-    const r = await sheetsRequest('GET','/values/'+encodeURIComponent(SHEET_RG+'!B2:B'));
-    existing = (r.values||[]).map(row=>row[0]);
-  } catch(e){}
-  
-  // Nur neue Rechnungen anhängen (keine Duplikate)
-  const neu = rechnungen.filter(r=>!existing.includes(r.nr));
-  if(neu.length === 0) return;
-  
-  const rows = neu.map(r=>([
-    r.datum ? r.datum.split('-').reverse().join('.') : '',
-    r.nr, r.empf||'', r.betreff||'',
-    r.betrag.toFixed(2).replace('.',',')
-  ]));
-  
-  await sheetsRequest('POST','/values/'+encodeURIComponent(SHEET_RG+'!A:E')+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',{
-    values: rows
-  });
-}
-
-async function syncEntwurf(){
-  // Aktuellen Formularstand speichern
-  const entwurf = {
-    datum: new Date().toISOString(),
-    felder: {
-      e_name: gv('e_name'), e_str: gv('e_str'), e_plz: gv('e_plz'), e_ort: gv('e_ort'),
-      rg_nr: gv('rg_nr'), rg_dat: gv('rg_dat'), lz_von: gv('lz_von'), lz_bis: gv('lz_bis'),
-      faellig: gv('faellig'), betreff: gv('betreff'), auf_dat: gv('auf_dat')
-    },
-    positionen: positions
-  };
-  await sheetsRequest('POST','/values/'+encodeURIComponent(SHEET_ENT+'!A:B')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{
-    values:[[new Date().toLocaleString('de-DE'), JSON.stringify(entwurf)]]
-  });
-}
-
-async function ladeEntwurf(){
-  if(!gSignedIn){ alert('Bitte zuerst mit Google verbinden.'); return; }
-  setGStatus('loading','Lade letzten Entwurf...');
-  try{
-    const r = await sheetsRequest('GET','/values/'+encodeURIComponent(SHEET_ENT+'!A:B'));
-    const rows = r.values||[];
-    if(rows.length < 2){ setGStatus('ok','Kein Entwurf gefunden'); return; }
-    // Letzten Eintrag laden
-    const last = rows[rows.length-1];
-    const data = JSON.parse(last[1]);
-    // Felder befüllen
-    Object.entries(data.felder||{}).forEach(([id,val])=>{
-      const el = document.getElementById(id);
-      if(el) el.value = val;
-    });
-    if(data.positionen) positions = data.positionen;
-    renderPos(); upd();
-    setGStatus('ok','Entwurf geladen \u2713');
-  } catch(e){
-    setGStatus('err','Fehler: '+e.message);
-  }
-}
-
-// Beim Start initialisieren
-window.addEventListener('load', ()=>setTimeout(initGoogleAuth, 800));
-
-// saveRechnung auch zu Sheets synchronisieren
-const _origSaveRechnung = saveRechnung;
 
 let previewVisible=true;
 function togglePreview(){
