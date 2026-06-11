@@ -108,6 +108,22 @@ select{cursor:pointer}
   body.show-preview .sidebar{display:flex}
   body.show-form .sidebar{display:none}
   body.show-form .form{display:block}
+  /* Positionstabelle als gestapelte Karten */
+  .ptable, .ptable tbody, .ptable tr, .ptable td{display:block;width:100%}
+  .ptable thead{display:none}
+  .ptable tr{border:1px solid var(--bdr);border-radius:8px;padding:12px 12px 36px 12px;margin-bottom:12px;background:#fafaf8;position:relative}
+  .ptable td{padding:4px 0;border:none;text-align:left !important;vertical-align:top}
+  .ptable td input, .ptable td select{width:100% !important;text-align:left !important;box-sizing:border-box}
+  .ptable .td-nr{position:absolute;top:10px;right:12px;background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;font-size:11px;padding:0}
+  .ptable .td-unit, .ptable .td-qty, .ptable .td-price{display:inline-block;width:31.5%;vertical-align:top;margin-right:2%}
+  .ptable .td-price{margin-right:0}
+  .ptable .td-unit::before{content:"Einheit";display:block;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .ptable .td-qty::before{content:"Menge";display:block;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .ptable .td-price::before{content:"Einzelpreis";display:block;font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .ptable .td-unit input, .ptable .td-qty input, .ptable .td-price input{text-align:center !important}
+  .ptable .td-total{text-align:right !important;font-weight:700;padding-top:8px;margin-top:6px;border-top:1px solid #eee !important}
+  .ptable .td-total::before{content:"Gesamt: ";font-size:11px;color:var(--muted);font-weight:400}
+  .ptable .td-del{position:absolute;bottom:8px;right:12px;width:auto;padding:0}
 }
 @media (min-width: 821px){
   .mtabs{display:none}
