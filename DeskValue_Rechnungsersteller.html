@@ -111,7 +111,7 @@ select{cursor:pointer}
   /* Positionstabelle als gestapelte Karten */
   .ptable, .ptable tbody, .ptable tr, .ptable td{display:block;width:100%}
   .ptable thead{display:none}
-  .ptable tr{border:1px solid var(--bdr);border-radius:8px;padding:12px 12px 36px 12px;margin-bottom:12px;background:#fafaf8;position:relative}
+  .ptable tr{border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:12px;background:#fafaf8;position:relative}
   .ptable td{padding:4px 0;border:none;text-align:left !important;vertical-align:top}
   .ptable td input, .ptable td select{width:100% !important;text-align:left !important;box-sizing:border-box}
   .ptable .td-nr{position:absolute;top:10px;right:12px;background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;font-size:11px;padding:0}
@@ -123,7 +123,9 @@ select{cursor:pointer}
   .ptable .td-unit input, .ptable .td-qty input, .ptable .td-price input{text-align:center !important}
   .ptable .td-total{text-align:right !important;font-weight:700;padding-top:8px;margin-top:6px;border-top:1px solid #eee !important}
   .ptable .td-total::before{content:"Gesamt: ";font-size:11px;color:var(--muted);font-weight:400}
-  .ptable .td-del{position:absolute;bottom:8px;right:12px;width:auto;padding:0}
+  .ptable .td-del{display:block;width:100%;text-align:center;padding-top:10px;margin-top:8px;border-top:1px solid #eee}
+  .ptable .td-del .delbtn{width:100%;background:#fdf0ee;color:var(--red);border:1px solid #f0d0ca;border-radius:6px;padding:9px;font-size:13px;font-weight:700;font-family:Arial,sans-serif}
+  .ptable .td-del .delbtn::after{content:" Position löschen"}
 }
 @media (min-width: 821px){
   .mtabs{display:none}
@@ -339,7 +341,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 
 function addPos(){positions.push({desc:"",detail:"",unit:"pau.",qty:"1",price:""});renderPos();upd();}
-function delPos(i){if(positions.length>1){positions.splice(i,1);renderPos();upd();}}
+function delPos(i){if(positions.length>1){positions.splice(i,1);}else{positions[0]={desc:"",detail:"",unit:"pau.",qty:"1",price:""};}renderPos();upd();}
 
 function renderPos(){
   const opts=PRESETS.map(p=>`<option value="${p.label}" data-unit="${p.unit}" data-qty="${p.qty}" data-price="${p.price}">${p.label}</option>`).join("");
