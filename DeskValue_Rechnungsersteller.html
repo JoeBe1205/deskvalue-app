@@ -178,7 +178,7 @@ select{cursor:pointer}
 </style>
 </head>
 <body>
-<header class="dv-top"><div><b>DeskValue</b> <small>Rechnungen &amp; Zahlungen · Version 4</small></div><nav class="dv-nav">
+<header class="dv-top"><div><b>DeskValue</b> <small>Rechnungen &amp; Zahlungen · Version 4.1</small></div><nav class="dv-nav">
 <button class="dv-btn primary" onclick="dvNewInvoice()">Neue Rechnung</button>
 <button class="dv-btn" onclick="dvShowManage('invoices')">Rechnungen</button>
 <button class="dv-btn" onclick="dvShowManage('customers')">Kunden</button>
@@ -1123,6 +1123,36 @@ async function dvReadBackup(file){
 }
 async function dvRestoreBackup(){if(!dvBackupPending)return;await dvMutate(d=>{const merged=dvMerge(d,dvBackupPending);for(const t of DV_TYPES)d[t]=merged[t];d.settings={...d.settings,...dvBackupPending.settings};});if(dvBackupPending.settings.exportYear)localStorage.setItem('dv_export_year_v4',String(dvBackupPending.settings.exportYear));dvBackupPending=null;dvSuggestNumber();dvCustomerOptions();dvRenderManage();dvNotice('Sicherung übernommen. Entwürfe können unter „Entwürfe“ geladen werden.');if(gToken)void gSyncAll();}
 function dvCanonical(x){if(Array.isArray(x))return '['+x.map(dvCanonical).join(',')+']';if(x&&typeof x==='object')return '{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+dvCanonical(x[k])).join(',')+'}';return JSON.stringify(x);}
+
+// Compare invoice content, including compatibility with pre-v4 field snapshots.
+function dvInvoiceDetailDiff(a,b){
+ const text=v=>String(v??'').replace(/\r\n/g,'\n').trim();
+ const number=v=>{const t=text(v);return t!==''&&Number.isFinite(Number(t))?String(Number(t)):t;};
+ const defaults=r=>({rg_nr:r.nr,rg_dat:r.datum,betreff:r.betreff,e_name:r.empf});
+ const fields=r=>{
+  const f={...defaults(r),...(r.felder||{})};
+  return Object.fromEntries(Object.entries(f).map(([k,v])=>[k,text(v)]));
+ };
+ const af=fields(a),bf=fields(b),diff=[];
+ const labels={rg_nr:'Rechnungsnummer',rg_dat:'Rechnungsdatum',betreff:'Betreff',e_name:'Empfänger',e_str:'Straße',e_plz:'PLZ',e_ort:'Ort',lz_von:'Leistungsbeginn',lz_bis:'Leistungsende',faellig:'Fälligkeit',auf_dat:'Auftragsdatum'};
+ for(const key of new Set([...Object.keys(af),...Object.keys(bf)]))if((af[key]||'')!==(bf[key]||''))diff.push(labels[key]||key);
+ const ap=a.positionen||[],bp=b.positionen||[];
+ if(ap.length!==bp.length)diff.push('Anzahl der Positionen');
+ for(let i=0;i<Math.min(ap.length,bp.length);i++){
+  const keys=new Set(['desc','detail','unit','qty','price',...Object.keys(ap[i]),...Object.keys(bp[i])]);
+  const names={desc:'Bezeichnung',detail:'Beschreibung',unit:'Einheit',qty:'Menge',price:'Einzelpreis'};
+  for(const k of keys){const normalize=['qty','price'].includes(k)?number:text;
+   if(normalize(ap[i][k])!==normalize(bp[i][k]))diff.push('Position '+(i+1)+' – '+(names[k]||k));
+  }
+ }
+ return diff;
+}
+function dvCheckInvoiceDetails(a,b){
+ if(!a.positionen||!b.positionen)return;
+ const differences=dvInvoiceDetailDiff(a,b);
+ if(differences.length)throw Error('Abweichende Rechnungsdetails zu '+b.nr+': '+differences.join(', ')+'. Beide Fassungen bleiben erhalten. Bitte vor einer Korrektur mit der ausgegebenen Rechnung vergleichen.');
+}
+
 function dvMerge(a,b){
  const out=dvClone(a);
  for(const type of DV_TYPES){
@@ -1131,7 +1161,7 @@ function dvMerge(a,b){
    const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
    if(type==='invoices'){
     if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Abweichende Daten zur Rechnungsnummer '+r.nr+'. Keine Daten überschrieben.');
-    if(old.positionen&&r.positionen&&(dvCanonical(old.positionen)!==dvCanonical(r.positionen)||dvCanonical(old.felder)!==dvCanonical(r.felder)))throw Error('Abweichende Rechnungsdetails zu '+r.nr+'. Bitte Originaldateien prüfen.');
+    dvCheckInvoiceDetails(old,r);
     if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
    }else{
     // Identical IDs represent the same payment/expense; only a void flag may change.
@@ -1339,7 +1369,7 @@ function dvMergeUnchecked(a,b){
    const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
    if(type==='invoices'){
     if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Nummernkonflikt '+r.nr+' in Google.');
-    if(old.positionen&&r.positionen&&(dvCanonical(old.positionen)!==dvCanonical(r.positionen)||dvCanonical(old.felder)!==dvCanonical(r.felder)))throw Error('Abweichende Rechnungsdetails '+r.nr+' in Google.');
+    dvCheckInvoiceDetails(old,r);
     if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
    }else if(type==='payments'||type==='expenses'){
     const core=x=>Object.fromEntries(Object.entries(x).filter(([k])=>!['rev','updatedAt','deleted'].includes(k)));
