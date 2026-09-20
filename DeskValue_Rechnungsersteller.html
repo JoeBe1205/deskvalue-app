@@ -178,7 +178,7 @@ select{cursor:pointer}
 </style>
 </head>
 <body>
-<header class="dv-top"><div><b>DeskValue</b> <small>Rechnungen &amp; Zahlungen · Version 4.1</small></div><nav class="dv-nav">
+<header class="dv-top"><div><b>DeskValue</b> <small>Rechnungen &amp; Zahlungen · Version 4.2</small></div><nav class="dv-nav">
 <button class="dv-btn primary" onclick="dvNewInvoice()">Neue Rechnung</button>
 <button class="dv-btn" onclick="dvShowManage('invoices')">Rechnungen</button>
 <button class="dv-btn" onclick="dvShowManage('customers')">Kunden</button>
@@ -531,8 +531,8 @@ window.addEventListener('afterprint',()=>{
 });
 
 
-function dvFooter(){return dvLoaded?.footerXml||F1_XML;}
-function dvCanExport(){try{if(dvLoaded)return true;dvValidateEntry(dvEntry());if(dvReadInvoices().some(r=>dvImportKey(r.nr)===dvImportKey(gv('rg_nr'))))throw Error('Nummer bereits gespeichert. Rechnung über die Übersicht öffnen oder eine neue Nummer verwenden.');return true;}catch(e){alert(e.message);return false;}}
+function dvFooter(){return dvLoaded?.footerXml||dvEditing?.footerXml||F1_XML;}
+function dvCanExport(){try{if(dvEditing)throw Error('Bitte zuerst die Korrektur speichern oder „Speichern & PDF“ wählen.');if(dvLoaded)return true;dvValidateEntry(dvEntry());if(dvReadInvoices().some(r=>dvImportKey(r.nr)===dvImportKey(gv('rg_nr'))))throw Error('Nummer bereits gespeichert. Rechnung über die Übersicht öffnen oder eine neue Nummer verwenden.');return true;}catch(e){alert(e.message);return false;}}
 
 // DOCX GENERATION
 async function generate(){
@@ -858,7 +858,7 @@ const DV_KEY='dv_data_v4';
 const DV_TYPES=['invoices','payments','expenses','customers','services','drafts'];
 const DV_FIELDS=['e_name','e_str','e_plz','e_ort','rg_nr','rg_dat','lz_von','lz_bis','faellig','betreff','auf_dat'];
 const DV_CATEGORIES=['Material / bezogene Leistungen','Raumkosten','Telefon / Internet / Porto','Bürobedarf','Software / Buchführung','Werbung','Fahrtkosten','Versicherung','Beratung / Fortbildung','Sonstige Betriebsausgaben'];
-let dvAutoNumber=true,dvSaving=false,dvReady=false,dvLoaded=null,dvTab='invoices',dvSelected=null,dvDraftTimer=null;
+let dvAutoNumber=true,dvSaving=false,dvReady=false,dvLoaded=null,dvEditing=null,dvTab='invoices',dvSelected=null,dvDraftTimer=null;
 let dvDirty=false,dvDevice='',dvSyncPromise=null,dvActionBusy=false;
 const dvUid=()=>crypto.randomUUID();
 const dvClone=x=>JSON.parse(JSON.stringify(x));
@@ -879,6 +879,11 @@ function dvValidate(db){
    ids.add(r.id);
    if(type==='invoices'){
     if(typeof r.nr!=='string'||!r.nr||!dvDate(r.datum)||typeof r.empf!=='string'||typeof r.betreff!=='string'||!Number.isFinite(r.betrag)||r.betrag<0||r.id!==dvImportKey(r.nr))throw Error('Ungültige Rechnung: '+r.nr);
+    if(r.history!==undefined){
+     if(!Array.isArray(r.history)||!r.history.length||r.parentRev!==r.history[r.history.length-1].rev)throw Error('Ungültiger Korrekturverlauf.');
+     const revisions=new Set([r.rev]);
+     for(const h of r.history){if(!h||h.history||h.id!==r.id||h.nr!==r.nr||revisions.has(h.rev))throw Error('Ungültige frühere Fassung.');revisions.add(h.rev);const check=dvBlank();check.invoices=[h];dvValidate(check);}
+    }
     if(r.positionen && (!Array.isArray(r.positionen)||r.positionen.some(p=>!p||['desc','detail','unit','qty','price'].some(k=>typeof p[k]!=='string'))))throw Error('Ungültige Positionen: '+r.nr);
     if(r.felder && (typeof r.felder!=='object'||Array.isArray(r.felder)||Object.values(r.felder).some(v=>typeof v!=='string')))throw Error('Ungültige Rechnungsfelder.');
    }
@@ -927,8 +932,8 @@ function dvNumber(rows,date){
  if(!Number.isSafeInteger(n+1))throw Error('Nummernkreis ungültig.');return 'RE_'+yy+'_'+String(n+1).padStart(2,'0');
 }
 function dvSuggestNumber(){
- try{rechnungen=dvReadInvoices();if(dvAutoNumber&&!dvLoaded)document.getElementById('rg_nr').value=dvNumber(rechnungen,gv('rg_dat'));
- document.getElementById('nr_hint').textContent=dvLoaded?'Gespeicherte Rechnung – geschützt. Für Änderungen als neue Vorlage verwenden.':'Vorschlag. Die Nummer wird beim Speichern übernommen.';upd();}
+ try{rechnungen=dvReadInvoices();if(dvAutoNumber&&!dvLoaded&&!dvEditing)document.getElementById('rg_nr').value=dvNumber(rechnungen,gv('rg_dat'));
+ document.getElementById('nr_hint').textContent=dvEditing?'Korrektur von '+dvEditing.nr+' · Nummer bleibt erhalten.':dvLoaded?'Gespeicherte Rechnung – geschützt. Änderungen über „Rechnungen → Korrigieren“.':'Vorschlag. Die Nummer wird beim Speichern übernommen.';upd();}
  catch(e){dvNotice(e.message,true);}
 }
 function dvNotice(text,error=false){const e=document.getElementById('dvNotice');if(e){e.textContent=text;e.className=error?'dv-notice error':'dv-notice';}}
@@ -937,7 +942,7 @@ function dvStatus(){
  const last=localStorage.getItem('dv_last_sync_v4');
  e.textContent=dvDirty?'Änderungen nur auf diesem Gerät gespeichert – Google-Synchronisierung ausstehend.':last?'Daten mit Google synchronisiert: '+new Date(last).toLocaleString('de-DE'):'Daten nur auf diesem Gerät. Google verbinden oder Sicherung herunterladen.';
 }
-function dvEntry(){return {nr:gv('rg_nr'),datum:gv('rg_dat'),empf:gv('e_name'),betreff:gv('betreff'),betrag:grand(),felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),footerXml:F1_XML};}
+function dvEntry(){return {nr:gv('rg_nr'),datum:gv('rg_dat'),empf:gv('e_name'),betreff:gv('betreff'),betrag:grand(),felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),footerXml:dvFooter()};}
 function dvValidateEntry(e){
  const missing=[];
  for(const [k,label] of [['e_name','Empfänger'],['e_str','Straße'],['e_plz','PLZ'],['e_ort','Ort'],['betreff','Betreff']])if(!e.felder[k])missing.push(label);
@@ -955,18 +960,23 @@ function dvValidateEntry(e){
 }
 function dvLockForm(lock){
  document.querySelectorAll('.form input,.form select,.form .ptable button,.form .add-btn').forEach(e=>e.disabled=lock);
- document.getElementById('dvSaveButton').disabled=lock;document.getElementById('dvSavePdf').disabled=false;
+ document.getElementById('dvSaveButton').disabled=lock;document.getElementById('dvSavePdf').disabled=dvSaving;
+ document.getElementById('rg_nr').disabled=lock||!!dvEditing;
+ document.getElementById('dvSaveButton').textContent=dvEditing?'Korrektur speichern':'Rechnung speichern';
+ let cancel=document.getElementById('dvCancelCorrection');
+ if(!cancel){cancel=document.createElement('button');cancel.id='dvCancelCorrection';cancel.type='button';cancel.className='dv-btn';cancel.textContent='Korrektur verwerfen';cancel.onclick=dvCancelCorrection;document.getElementById('dvSaveButton').after(cancel);}
+ cancel.hidden=!dvEditing;cancel.disabled=dvSaving;
 }
 function dvFill(entry,locked=false){
- dvReady=false;
+ dvReady=false;dvEditing=!locked&&entry.correctionBase?dvClone(entry.correctionBase):null;
  const fields=entry.felder||{};
  for(const id of DV_FIELDS)document.getElementById(id).value=fields[id]||'';
  document.getElementById('rg_nr').value=entry.nr||fields.rg_nr||'';document.getElementById('rg_dat').value=entry.datum||fields.rg_dat||'';
  document.getElementById('e_name').value=entry.empf||fields.e_name||'';document.getElementById('betreff').value=entry.betreff||fields.betreff||'';
  positions=dvClone(entry.positionen||[{desc:'',detail:'',unit:'pau.',qty:'1',price:''}]);
- dvLoaded=locked?entry:null;dvAutoNumber=!locked;renderPos();upd();dvLockForm(locked);dvReady=true;dvSuggestNumber();
+ dvLoaded=locked?entry:null;dvAutoNumber=!locked&&!dvEditing;renderPos();upd();dvLockForm(locked);dvReady=true;dvSuggestNumber();
 }
-function dvDraft(){return {id:dvDevice,felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),...dvStamp()};}
+function dvDraft(){return {id:dvDevice,...(dvEditing?{correctionBase:dvClone(dvEditing)}:{}),felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),...dvStamp()};}
 function dvHasWork(){return !!gv('e_name')||!!gv('betreff')||positions.some(p=>p.desc||p.price);}
 function dvSaveDraft(){
  if(!dvReady||dvLoaded)return;
@@ -980,27 +990,29 @@ function dvNewInvoice(){
  clearTimeout(dvDraftTimer);dvLoaded=null;const today=dvLocalDate(new Date()),due=new Date();due.setDate(due.getDate()+14);
  dvFill({felder:{rg_dat:today,faellig:dvLocalDate(due)},positionen:[{desc:'',detail:'',unit:'pau.',qty:'1',price:''}]});dvSaveDraft();mShow('form');dvNotice('Neue Rechnung.');
 }
-async function dvNextNumber(){if(dvLoaded){dvNotice('Gespeicherte Nummer bleibt unverändert. „Neue Rechnung“ oder „Als Vorlage“ wählen.');return;}dvAutoNumber=true;dvSuggestNumber();dvQueueDraft();}
+async function dvNextNumber(){if(dvLoaded||dvEditing){dvNotice('Gespeicherte Nummer bleibt unverändert. „Neue Rechnung“ oder „Als Vorlage“ wählen.');return;}dvAutoNumber=true;dvSuggestNumber();dvQueueDraft();}
 async function dvSaveInvoice(){
  if(dvLoaded)return dvLoaded;
  if(dvSaving)throw Error('Speichern läuft bereits.');
  dvSaving=true;document.getElementById('dvSaveButton').disabled=true;
  try{
-  const e=dvValidateEntry(dvEntry()),automatic=dvAutoNumber;
+  const e=dvValidateEntry(dvEntry()),automatic=dvAutoNumber,base=dvEditing?dvClone(dvEditing):null;
   // Keep the form and number fixed while the server is consulted.
   dvAutoNumber=false;dvLockForm(true);
   if(gToken)await gLoadRechnungen();
   const saved=await dvMutate(db=>{
-   if(db.invoices.some(r=>dvImportKey(r.nr)===dvImportKey(e.nr)))throw Error('Rechnungsnummer bereits vergeben. Bitte nächste freie Nummer verwenden.');
+   if(!base&&db.invoices.some(r=>dvImportKey(r.nr)===dvImportKey(e.nr)))throw Error('Rechnungsnummer bereits vergeben. Bitte nächste freie Nummer verwenden.');
    if(automatic&&dvNumber(db.invoices,e.datum)!==e.nr)throw Error('Der Rechnungsstand hat sich geändert. Bitte nächste freie Nummer verwenden.');
-   const r={...e,id:dvImportKey(e.nr),...dvStamp()};db.invoices.push(r);
+   let r;
+   if(base){const index=db.invoices.findIndex(x=>x.id===base.id);if(index<0)throw Error('Ursprüngliche Rechnung fehlt.');r=dvCorrectInvoice(db.invoices[index],base,e);db.invoices[index]=r;}
+   else{r={...e,id:dvImportKey(e.nr),...dvStamp()};db.invoices.push(r);}
    const d=db.drafts.find(d=>d.id===dvDevice);if(d){d.deleted=true;Object.assign(d,dvStamp());}
    return r;
   });
-  localStorage.removeItem('dv_local_draft_v4');clearTimeout(dvDraftTimer);dvLoaded=saved;dvAutoNumber=false;dvLockForm(true);dvSuggestNumber();
+  localStorage.removeItem('dv_local_draft_v4');clearTimeout(dvDraftTimer);dvLoaded=saved;dvEditing=null;dvAutoNumber=false;dvLockForm(true);dvSuggestNumber();
   document.getElementById('dvDraftState').textContent='Rechnung gespeichert und geschützt.';dvNotice(saved.nr+' auf diesem Gerät gespeichert.');
   if(gToken)void gSyncAll();return saved;
- }finally{dvSaving=false;if(!dvLoaded)dvLockForm(false);}
+ }finally{dvSaving=false;dvLockForm(!!dvLoaded);}
 }
 async function saveRechnung(){try{await dvSaveInvoice();}catch(e){dvNotice(e.message,true);alert(e.message);}}
 async function dvSaveAndPdf(){try{await dvSaveInvoice();savePdf();}catch(e){dvNotice(e.message,true);alert(e.message);}}
@@ -1047,8 +1059,44 @@ function dvRenderInvoices(){
 function dvInvoiceDetail(id){
  const db=dvReadDB(),r=db.invoices.find(r=>r.id===id);if(!r)return;dvSelected=id;
  const paid=dvReceipts(db,id),balance=dvBalance(db,r),complete=!!r.positionen?.length&&!!r.felder;
- document.getElementById('dvManageBody').innerHTML=`${dvButton('← Übersicht','backInvoices')}<h3>${xe(r.nr)} · ${xe(r.empf)}</h3><p>${xe(r.betreff)}</p><p>${fd(r.datum)} · ${dvInvoiceStatus(db,r)} · Rechnungsbetrag <b>${eur(r.betrag)}</b> · ${balance<0?'Überzahlung':'Offen'} <b>${eur(Math.abs(balance)/100)}</b></p><div class="dv-tools">${dvButton('Rechnung ansehen','openInvoice',id,complete?'':'disabled')}${dvButton('Als Vorlage','template',id,complete?'':'disabled')}${dvButton('Zahlungserinnerung','reminder',id,balance>0?'':'disabled')}</div>${complete?'':'<p class="dv-info">Dieser ältere Eintrag enthält nur die Übersicht. Die ursprüngliche Word-Rechnung noch einmal importieren, um Anschrift, Positionen und Fälligkeit zu ergänzen.</p>'}
- <h3>Zahlung erfassen</h3><div class="dv-grid">${dvField('p_date','Zahlungseingang',dvLocalDate(new Date()),'date')}${dvField('p_amount','Betrag (€)',balance>0?(balance/100).toFixed(2):'','number','step="0.01" min="0.01"')}${dvField('p_note','Vermerk (optional)')}</div>${dvButton('Zahlung speichern','savePayment',id)}<h3>Erfasste Zahlungen</h3>${paid.map(p=>`<div class="dv-card">${fd(p.date)} · <b>${eur(p.cents/100)}</b> · ${xe(p.note||'')}${dvButton('Fehleintrag aufheben','voidPayment',p.id)}</div>`).join('')||'<p>Noch kein Zahlungseingang erfasst. Das ist keine Aussage über deinen Kontoauszug.</p>'}<div id="dvReminder"></div>`;
+ document.getElementById('dvManageBody').innerHTML=`${dvButton('← Übersicht','backInvoices')}<h3>${xe(r.nr)} · ${xe(r.empf)}</h3><p>${xe(r.betreff)}</p><p>${fd(r.datum)} · ${dvInvoiceStatus(db,r)} · Rechnungsbetrag <b>${eur(r.betrag)}</b> · ${balance<0?'Überzahlung':'Offen'} <b>${eur(Math.abs(balance)/100)}</b></p><div class="dv-tools">${dvButton('Rechnung ansehen','openInvoice',id,complete?'':'disabled')}${dvButton('Korrigieren','correctInvoice',id)}${dvButton('Als Vorlage','template',id,complete?'':'disabled')}${dvButton('Zahlungserinnerung','reminder',id,balance>0?'':'disabled')}</div>${complete?'':'<p class="dv-info">Dieser ältere Eintrag enthält nur die Übersicht. Die ursprüngliche Word-Rechnung noch einmal importieren, um Anschrift, Positionen und Fälligkeit zu ergänzen.</p>'}
+ ${dvHistoryHtml(r)}<h3>Zahlung erfassen</h3><div class="dv-grid">${dvField('p_date','Zahlungseingang',dvLocalDate(new Date()),'date')}${dvField('p_amount','Betrag (€)',balance>0?(balance/100).toFixed(2):'','number','step="0.01" min="0.01"')}${dvField('p_note','Vermerk (optional)')}</div>${dvButton('Zahlung speichern','savePayment',id)}<h3>Erfasste Zahlungen</h3>${paid.map(p=>`<div class="dv-card">${fd(p.date)} · <b>${eur(p.cents/100)}</b> · ${xe(p.note||'')}${dvButton('Fehleintrag aufheben','voidPayment',p.id)}</div>`).join('')||'<p>Noch kein Zahlungseingang erfasst. Das ist keine Aussage über deinen Kontoauszug.</p>'}<div id="dvReminder"></div>`;
+}
+function dvStartCorrection(id){
+ const r=dvReadInvoices().find(x=>x.id===id);if(!r)throw Error('Rechnung nicht gefunden.');
+ if(!confirm('Ist '+r.nr+' noch nicht verschickt? Nur dann hier korrigieren. Die Nummer und erfasste Zahlungen bleiben erhalten; die bisherige Fassung wird archiviert.'))return;
+ if(!dvLoaded&&dvHasWork()&&!confirm('Aktuellen Entwurf ersetzen? Bei Bedarf vorher als Entwurf sichern.'))return;
+ clearTimeout(dvDraftTimer);dvFill({...dvClone(r),correctionBase:dvClone(r)},false);dvSaveDraft();
+ document.getElementById('dvManage').close();mShow('form');
+ dvNotice(r.positionen?.length?'Korrektur: Positionen ändern oder hinzufügen, danach „Korrektur speichern“.':'Nur die Rechnungsübersicht ist vorhanden. Anschrift und sämtliche Positionen anhand der Originalrechnung ergänzen.');
+}
+async function dvCancelCorrection(){
+ if(dvSaving||!dvEditing||!confirm('Ungespeicherte Korrektur verwerfen?'))return;
+ try{const id=dvEditing.id;await dvMutate(db=>{const d=db.drafts.find(x=>x.id===dvDevice);if(d){d.deleted=true;Object.assign(d,dvStamp());}});
+ clearTimeout(dvDraftTimer);localStorage.removeItem('dv_local_draft_v4');const r=dvReadInvoices().find(x=>x.id===id);dvFill(r,true);dvNotice('Korrektur verworfen. Gespeicherte Fassung geöffnet.');}
+ catch(e){dvNotice(e.message,true);}
+}
+function dvCorrectInvoice(current,base,entry){
+ if(current.rev!==base.rev||!dvSameSummary(current,base)||dvInvoiceDetailDiff(current,base).length)throw Error('Die Rechnung wurde zwischenzeitlich geändert. Korrektur als Entwurf sichern und die aktuelle Rechnung erneut öffnen.');
+ if(entry.nr!==current.nr)throw Error('Die Rechnungsnummer darf bei einer Korrektur nicht geändert werden.');
+ const prior=dvClone(current);delete prior.history;
+ return {...dvClone(current),...dvClone(entry),id:current.id,history:[...(current.history||[]),prior],parentRev:current.rev,...dvStamp()};
+}
+function dvHistoryHtml(r){
+ if(!r.history?.length)return '';
+ return '<details><summary>Frühere Fassungen ('+r.history.length+')</summary>'+r.history.map((h,i)=>'<div class="dv-card"><b>Fassung '+(i+1)+'</b> · '+xe(h.nr)+' · '+fd(h.datum)+' · '+eur(h.betrag)+'<p>'+xe(h.empf)+' · '+xe(h.betreff)+'</p>'+(h.positionen||[]).map(p=>'<p>'+xe(p.qty)+' '+xe(p.unit)+' × '+xe(p.desc)+' · '+eur(Number(p.price))+'<br>'+xe(p.detail||'')+'</p>').join('')+'</div>').join('')+'</details>';
+}
+function dvMergeInvoice(old,r){
+ const ancestor=(newer,older)=>newer.history?.some(h=>h.rev===older.rev&&dvSameSummary(h,older)&&(!h.positionen||!older.positionen||!dvInvoiceDetailDiff(h,older).length));
+ if(old.rev!==r.rev){if(ancestor(r,old))return dvClone(r);if(ancestor(old,r))return dvClone(old);}
+ // Legacy Sheets rows have no revision history: accept only known historical summaries.
+ const summaryOnly=x=>!x.positionen&&String(x.rev).startsWith('legacy-');
+ if(summaryOnly(r)&&(dvSameSummary(old,r)||old.history?.some(h=>dvSameSummary(h,r))))return dvClone(old);
+ if(summaryOnly(old)&&(dvSameSummary(r,old)||r.history?.some(h=>dvSameSummary(h,old))))return dvClone(r);
+ if((old.history?.length||r.history?.length)&&old.rev!==r.rev)throw Error('Gleichzeitige Korrekturen zu '+r.nr+'. Bitte beide Geräte sichern und Fassungen vergleichen.');
+ if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Abweichende Daten zur Rechnungsnummer '+r.nr+'. Keine Daten überschrieben.');
+ dvCheckInvoiceDetails(old,r);
+ return dvClone(!old.positionen&&r.positionen?r:old);
 }
 function dvLoadInvoice(id,template=false){
  const r=dvReadInvoices().find(r=>r.id===id);if(!r?.positionen?.length||!r.felder)throw Error('Bitte zuerst die vollständige Word-Rechnung importieren.');
@@ -1064,6 +1112,7 @@ async function dvAction(action,id){
   const db=dvReadDB();
   if(action==='backInvoices'){dvShowManage('invoices');return;}
   if(action==='invoice'){dvInvoiceDetail(id);return;}
+  if(action==='correctInvoice'){dvStartCorrection(id);return;}
   if(action==='template'||action==='openInvoice'){dvLoadInvoice(id,action==='template');return;}
   if(action==='savePayment'){
    const date=gv('p_date'),cents=dvCents(gv('p_amount')),note=gv('p_note');if(!dvDate(date)||date>dvLocalDate(new Date())||!Number.isSafeInteger(cents)||cents<=0)throw Error('Gültiges Zahlungsdatum (nicht zukünftig) und positiven Betrag eintragen.');
@@ -1160,9 +1209,7 @@ function dvMerge(a,b){
   for(const r of b[type]){
    const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
    if(type==='invoices'){
-    if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Abweichende Daten zur Rechnungsnummer '+r.nr+'. Keine Daten überschrieben.');
-    dvCheckInvoiceDetails(old,r);
-    if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
+    map.set(r.id,dvMergeInvoice(old,r));
    }else{
     // Identical IDs represent the same payment/expense; only a void flag may change.
     if(type==='payments'||type==='expenses'){
@@ -1368,9 +1415,7 @@ function dvMergeUnchecked(a,b){
   for(const r of b[type]){
    const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
    if(type==='invoices'){
-    if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Nummernkonflikt '+r.nr+' in Google.');
-    dvCheckInvoiceDetails(old,r);
-    if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
+    map.set(r.id,dvMergeInvoice(old,r));
    }else if(type==='payments'||type==='expenses'){
     const core=x=>Object.fromEntries(Object.entries(x).filter(([k])=>!['rev','updatedAt','deleted'].includes(k)));
     if(dvCanonical(core(old))!==dvCanonical(core(r)))throw Error('Zahlungskonflikt in Google.');
@@ -1388,10 +1433,12 @@ async function dvReadRemote(){
   gReq('GET','/values/'+encodeURIComponent(DV_SHEET+'!A:F'))
  ]);
  const result=dvParseCloud(data.values||[]),old=dvBlank();
- const seen=new Map();
- for(const x of (legacy.values||[]).slice(1).filter(r=>r[1])){
+ const seen=new Map();result.legacyRows=[];
+ for(const [offset,x] of (legacy.values||[]).slice(1).entries()){
+  if(!x[1])continue;
   const date=String(x[0]||''),m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(date);
   const r=dvRecordInvoice({nr:String(x[1]).trim(),datum:m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):date,empf:String(x[2]||''),betreff:String(x[3]||''),betrag:dvAmount(x[4])});
+  result.legacyRows.push({row:offset+2,invoice:r});
   if(seen.has(r.id)){if(!dvSameSummary(seen.get(r.id),r))throw Error('Abweichende doppelte Nummer in Google: '+r.nr);continue;}
   seen.set(r.id,r);old.invoices.push(r);
  }
@@ -1404,6 +1451,7 @@ async function gLoadRechnungen(){
 }
 async function gPushRechnungen(known){
  const remote=known||await dvReadRemote();const db=dvReadDB();
+ for(const row of remote.legacyRows||[]){const r=db.invoices.find(x=>x.id===row.invoice.id);if(r&&!dvSameSummary(r,row.invoice))await gReq('PUT','/values/'+encodeURIComponent(G_SHEET_RG+'!A'+row.row+':E'+row.row)+'?valueInputOption=RAW',{values:[[fd(r.datum),r.nr,r.empf,r.betreff,r.betrag]]});}
  const fresh=db.invoices.filter(r=>!remote.legacyIds.has(r.id));
  if(fresh.length)await gReq('POST','/values/'+encodeURIComponent(G_SHEET_RG+'!A:E')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{values:fresh.map(r=>[fd(r.datum),r.nr,r.empf,r.betreff,r.betrag])});
 }
