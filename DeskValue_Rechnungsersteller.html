@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" translate="no">
 <head>
 <meta charset="UTF-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DeskValue – Rechnungsersteller</title>
 <meta name="theme-color" content="#c0392b">
@@ -160,16 +161,40 @@ select{cursor:pointer}
   #printInvoice .pi-note{font-size:8pt;color:#555;margin:4mm 0}
   #printInvoice .pi-footer{border-top:1px solid #bbb;padding-top:3mm;margin-top:9mm;font-size:8pt;color:#666;break-inside:avoid}
 }
+
+.dv-top{padding:18px 28px;background:white;border-bottom:1px solid var(--bdr)}
+.dv-top small{color:#666;margin-left:10px}.dv-nav,.dv-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.dv-tools>*{flex:1;min-width:130px}
+.dv-btn{border:1px solid #ccc;border-radius:6px;padding:9px 12px;background:white;color:#333;font:13px Arial;cursor:pointer;margin:3px}
+.dv-btn:hover{border-color:var(--red)}.dv-btn.primary,.dv-btn.active{background:var(--red);border-color:var(--red);color:white}
+.dv-btn:disabled{opacity:.45;cursor:not-allowed}.dv-info,#dvDataStatus,#dvDraftState{font-size:12px;line-height:1.6;color:#666;margin:8px 0}
+.dv-notice{font-size:13px;line-height:1.5;color:#246b35}.dv-notice.error{color:#a32420}
+.dv-dialog{margin:auto;width:min(1050px,96vw);max-height:92dvh;overflow:auto;border:1px solid #ccc;border-radius:12px;padding:22px;color:#222}
+.dv-dialog::backdrop{background:#0008}.dv-dialoghead{display:flex;justify-content:space-between;align-items:center;gap:12px}.dv-dialog h2{font-size:20px}.dv-dialog h3{font-size:16px;margin:18px 0 10px}
+.dv-dialog p{line-height:1.6;margin:8px 0}.dv-dialog textarea{width:100%;padding:12px;font:14px/1.5 Arial;border:1px solid #ccc;border-radius:6px}
+.dv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.dv-field{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#666;letter-spacing:0;text-transform:none}
+.dv-list{margin-top:18px}.dv-card{padding:14px;margin:10px 0;border:1px solid #ddd;border-radius:8px;overflow-wrap:anywhere;background:#fafaf8}.dv-card.overdue{border-left:4px solid #c0392b;background:#fff6f3}.dv-cardhead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.dv-badge{padding:3px 8px;background:#eee;border-radius:12px;font-size:11px}
+#euerRgList td{padding:8px;vertical-align:top}#dvImportRows table{min-width:640px}.mtabs{grid-column:1/-1}
+@media(max-width:600px){.dv-top{padding:14px}.dv-top small{display:block;margin:4px 0}.dv-nav{gap:3px}.dv-btn{padding:10px;font-size:12px;margin:2px}.dv-dialog{padding:14px}.dv-grid{grid-template-columns:1fr}.dv-dialoghead h2{font-size:17px}.dv-cardhead{display:block}.dv-badge{display:inline-block;margin-top:6px}}
 </style>
 </head>
 <body>
+<header class="dv-top"><div><b>DeskValue</b> <small>Rechnungen &amp; Zahlungen · Version 4</small></div><nav class="dv-nav">
+<button class="dv-btn primary" onclick="dvNewInvoice()">Neue Rechnung</button>
+<button class="dv-btn" onclick="dvShowManage('invoices')">Rechnungen</button>
+<button class="dv-btn" onclick="dvShowManage('customers')">Kunden</button>
+<button class="dv-btn" onclick="dvShowManage('services')">Leistungen</button>
+<button class="dv-btn" onclick="dvShowManage('expenses')">Ausgaben</button>
+<button class="dv-btn" onclick="dvShowManage('drafts')">Entwürfe</button>
+<button class="dv-btn" onclick="dvShowManage('backup')">Sicherung</button>
+</nav><p id="dvDataStatus" role="status"></p><p id="dvNotice" role="status" class="dv-notice"></p></header>
+
 <div class="app">
 <div class="mtabs">
   <button class="mtab active" id="mtabForm" onclick="mShow('form')">Rechnung</button>
   <button class="mtab" id="mtabPrev" onclick="mShow('preview')">Vorschau</button>
 </div>
 <div class="form">
-  <div class="apphead">
+  <p id="dvDraftState" class="dv-info"></p><div class="apphead">
     <div class="brand">Desk<span>Value</span></div>
     <div class="pill">Rechnungsersteller</div>
   </div>
@@ -177,7 +202,7 @@ select{cursor:pointer}
   <div class="sec">
     <div class="sech"><div class="num">1</div><h2>Rechnungsempfänger</h2></div>
     <div class="secb">
-      <div class="field"><label>Firma / Name</label><input id="e_name" placeholder="Musterfirma GmbH" oninput="upd()"></div>
+      <div class="dv-tools"><select id="dvCustomerSelect" onchange="dvUseCustomer()"><option>Kunden laden …</option></select><button class="add-btn" onclick="dvCaptureCustomer()">Als Kunde speichern</button></div><div class="field"><label>Firma / Name</label><input id="e_name" placeholder="Musterfirma GmbH" oninput="upd()"></div>
       <div class="field"><label>Straße &amp; Hausnummer</label><input id="e_str" placeholder="Musterstraße 1" oninput="upd()"></div>
       <div class="g2" style="margin-top:12px">
         <div class="field"><label>PLZ</label><input id="e_plz" placeholder="33100" maxlength="5" oninput="plzLookup();upd()"></div>
@@ -268,9 +293,10 @@ select{cursor:pointer}
     </svg>
     Rechnung als .docx
   </button>
+  <button class="dl-btn" id="dvSavePdf" onclick="dvSaveAndPdf()" style="background:#26733a">Speichern &amp; PDF</button>
   <button class="dl-btn" id="pdfbtn" onclick="savePdf()" style="background:#555">Als PDF speichern</button>
   <p class="hint">Im Druckdialog „Als PDF speichern“ auswählen. Format A4; Kopf- und Fußzeilen des Browsers ausschalten. Der PDF-Export allein speichert die Rechnung nicht in der Übersicht.</p>
-  <button class="dl-btn" onclick="saveRechnung()" style="background:#27ae60;margin-top:-6px">
+  <button class="dl-btn" id="dvSaveButton" onclick="saveRechnung()" style="background:#27ae60;margin-top:-6px">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     Rechnung speichern
   </button>
@@ -304,8 +330,8 @@ select{cursor:pointer}
         <div id="euerSumme" style="font-size:13px;font-weight:700;color:#2a6496;margin-left:auto"></div>
       </div>
 
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:8px">Gespeicherte Rechnungen</div>
-      <div style="border:1px solid #eee;border-radius:6px;overflow:hidden;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:8px">Erfasste Zahlungseingänge</div>
+      <div style="border:1px solid #eee;border-radius:6px;overflow:auto;margin-bottom:16px">
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:#f8f8f6">
             <th style="padding:8px;text-align:left;font-size:11px;color:#888;font-weight:700;border-bottom:1px solid #eee">Datum</th>
@@ -319,10 +345,8 @@ select{cursor:pointer}
       </div>
 
       <div style="background:#f0f7ff;border:1px solid #c8dff0;border-radius:6px;padding:14px;font-size:12px;color:#2a6496;line-height:1.6">
-        <b>Was wird exportiert:</b><br>
-        <b>Blatt 1 – Einnahmen:</b> Alle gemerkten Rechnungen des Steuerjahres mit Formeln<br>
-        <b>Blatt 2 – Ausgaben:</b> Vorbelegte Kategorien nach Anlage EÜR (Beträge manuell eintragen)<br>
-        <b>Blatt 3 – Gewinnermittlung:</b> Automatische Zusammenfassung §4 Abs. 3 EStG
+        <b>Export:</b> Ergebnis, erfasste Zahlungseingänge, bezahlte Ausgaben und eine separate Rechnungsübersicht. Einnahmen und Ausgaben haben freie Zeilen für Ergänzungen in Excel. Diese Ergänzungen werden nicht in die App zurückübertragen.
+        <p id="dvEuerNote" style="margin-top:8px"></p>
       </div>
     </div>
     <div style="padding:16px 24px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end">
@@ -346,6 +370,8 @@ select{cursor:pointer}
   </div>
 </dialog>
 
+<dialog id="dvManage" class="dv-dialog"><div class="dv-dialoghead"><h2>DeskValue Verwaltung</h2><button class="dv-btn" onclick="document.getElementById('dvManage').close()">Schließen</button></div>
+<nav id="dvManageNav" class="dv-nav"><button class="dv-btn" data-tab="invoices">Rechnungen</button><button class="dv-btn" data-tab="customers">Kunden</button><button class="dv-btn" data-tab="services">Leistungen</button><button class="dv-btn" data-tab="expenses">Ausgaben</button><button class="dv-btn" data-tab="drafts">Entwürfe</button><button class="dv-btn" data-tab="backup">Sicherung</button></nav><div id="dvManageBody"></div></dialog>
 <article id="printInvoice" aria-hidden="true"></article>
 <script>
 // ASSETS
@@ -387,11 +413,11 @@ document.addEventListener("DOMContentLoaded",()=>{
   renderPos(); upd(); dvSuggestNumber();
 });
 
-function addPos(){positions.push({desc:"",detail:"",unit:"pau.",qty:"1",price:""});renderPos();upd();}
-function delPos(i){if(positions.length>1){positions.splice(i,1);}else{positions[0]={desc:"",detail:"",unit:"pau.",qty:"1",price:""};}renderPos();upd();}
+function addPos(){positions.push({desc:"",detail:"",unit:"pau.",qty:"1",price:""});renderPos();upd();dvQueueDraft();}
+function delPos(i){if(positions.length>1){positions.splice(i,1);}else{positions[0]={desc:"",detail:"",unit:"pau.",qty:"1",price:""};}renderPos();upd();dvQueueDraft();}
 
 function renderPos(){
-  const opts=PRESETS.map(p=>`<option value="${p.label}" data-unit="${p.unit}" data-qty="${p.qty}" data-price="${p.price}">${p.label}</option>`).join("");
+  const opts=dvAllPresets().map(p=>`<option value="${xe(p.label)}" data-unit="${xe(p.unit)}" data-qty="${xe(p.qty)}" data-price="${xe(p.price)}">${xe(p.label)}</option>`).join("");
   document.getElementById("ptbody").innerHTML=positions.map((p,i)=>`
     <tr>
       <td class="td-nr">${i+1}</td>
@@ -418,11 +444,11 @@ function applyPreset(i,sel){
   positions[i].unit=o.dataset.unit||"pau.";
   positions[i].qty=o.dataset.qty||"1";
   positions[i].price=o.dataset.price||"";
-  renderPos();upd();
+  renderPos();upd();dvQueueDraft();
 }
 
-function ptot(p){return(parseFloat(p.qty)||0)*(parseFloat(p.price)||0);}
-function grand(){return positions.reduce((s,p)=>s+ptot(p),0);}
+function ptot(p){return Math.round(((Number(p.qty)||0)*(Number(p.price)||0)+Number.EPSILON)*100)/100;}
+function grand(){return positions.reduce((s,p)=>s+Math.round(ptot(p)*100),0)/100;}
 
 function renderTots(){
   const g=grand();
@@ -465,7 +491,7 @@ function dvPrintMarkup(){
   const h=xe, nr=gv('rg_nr'),bet=gv('betreff');
   const period=[fd(gv('lz_von')),fd(gv('lz_bis'))].filter(Boolean).join(' – ');
   const metadata=[['Rechnungsnummer',nr],['Rechnungsdatum',fd(gv('rg_dat'))],['Leistungszeitraum',period],['Fälligkeitsdatum',fd(gv('faellig'))]];
-  const footdoc=new DOMParser().parseFromString(F1_XML,'application/xml');
+  const footdoc=new DOMParser().parseFromString(dvFooter(),'application/xml');
   const foot=Array.from(footdoc.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main','p')).map(p=>
     Array.from(p.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main','t')).map(t=>t.textContent).join(' ').replace(/\bSeite\s*$/,'').trim()).filter(Boolean);
   return `<div class="pi-sender">DeskValue – Josef Benke · Krügers Kamp 9a · 33106 Paderborn</div>
@@ -492,6 +518,7 @@ function dvPreparePrint(){
   document.title='DeskValue_Rechnung_'+(gv('rg_nr')||'Entwurf');
 }
 function savePdf(){
+  if(!dvCanExport())return;
   if(!gv('rg_nr') || !gv('rg_dat') || !gv('e_name') || !gv('e_str') || !gv('e_plz') || !gv('e_ort') || !positions.length || positions.some(p=>!p.desc.trim() || !p.qty.trim() || !p.price.trim() || !Number.isFinite(Number(p.qty)) || Number(p.qty)<=0 || !Number.isFinite(Number(p.price)) || Number(p.price)<0)){
     alert('Bitte Rechnungsnummer, Datum, vollständige Empfängeradresse und gültige Leistungspositionen eintragen.');return;
   }
@@ -503,8 +530,13 @@ window.addEventListener('afterprint',()=>{
   if(dvBeforePrintTitle!==null){document.title=dvBeforePrintTitle;dvBeforePrintTitle=null;}
 });
 
+
+function dvFooter(){return dvLoaded?.footerXml||F1_XML;}
+function dvCanExport(){try{if(dvLoaded)return true;dvValidateEntry(dvEntry());if(dvReadInvoices().some(r=>dvImportKey(r.nr)===dvImportKey(gv('rg_nr'))))throw Error('Nummer bereits gespeichert. Rechnung über die Übersicht öffnen oder eine neue Nummer verwenden.');return true;}catch(e){alert(e.message);return false;}}
+
 // DOCX GENERATION
 async function generate(){
+  if(!dvCanExport())return;
   const btn=document.getElementById("dlbtn");
   btn.disabled=true;btn.textContent="Wird erstellt…";
   try{await buildDocx();}
@@ -659,13 +691,13 @@ ${pp(ar("DeskValue – Bürodienstleistungen & Immobilienbewertung",false,16,"55
   zip.file("word/_rels/footer1.xml.rels",`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`);
   zip.file("word/document.xml",docXml);
   zip.file("word/header1.xml",H1_XML);
-  zip.file("word/footer1.xml",F1_XML);
+  zip.file("word/footer1.xml",dvFooter());
   zip.file("word/settings.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="708"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`);
   zip.file("word/styles.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:lang w:val="de-DE"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="table" w:styleId="TableNormal" w:default="1"><w:name w:val="Normal Table"/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/></w:tblPr></w:style></w:styles>`);
   zip.file("word/media/logo_watermark.png",b64arr(WM_B64),{binary:true});
 
   const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",compression:"DEFLATE",compressionOptions:{level:6}});
-  saveAs(blob,"DeskValue_Rechnung_"+(gv("rg_nr")||"neu")+".docx");
+  saveAs(blob,"DeskValue_Rechnung_"+nr+".docx");
 }
 
 // UTILS
@@ -731,19 +763,6 @@ function dvParseInvoiceXml(xml){
   if(!subject)throw new Error('Betreff fehlt.');
   return {nr,datum,empf,betreff:subject.replace(/^Betreff:\s*/,''),betrag:dvAmount(a[1])};
 }
-function dvImportPlan(items,existing){
-  const map=new Map(existing.map(r=>[dvImportKey(r.nr),r]));
-  return items.map(item=>{
-    if(item.error)return {...item,status:'Fehler: '+item.error,add:false};
-    const key=dvImportKey(item.entry.nr),old=map.get(key);
-    if(old){
-      const same=dvSameSummary({...old,nr:item.entry.nr},item.entry);
-      return {...item,status:same?'Bereits vorhanden – übersprungen':'Nummernkonflikt – nicht übernommen',add:false};
-    }
-    map.set(key,item.entry);
-    return {...item,status:'Neu',add:true};
-  });
-}
 function dvRenderImport(plan){
   document.getElementById('dvImportRows').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left"><thead><tr>'+['Datei / Nummer','Datum','Empfänger / Betreff','Betrag','Status'].map(t=>'<th style="padding:8px;border-bottom:1px solid #ddd">'+t+'</th>').join('')+'</tr></thead><tbody>'+plan.map(i=>{
     const r=i.entry;
@@ -775,275 +794,388 @@ async function dvReadImport(files){
         if(!part)throw new Error('Keine gültige Word-Datei.');
         const xml=await part.async('string');
         if(xml.length>5*1024*1024)throw new Error('Dokumentinhalt zu groß.');
-        dvImportItems.push({name:file.name,entry:dvParseInvoiceXml(xml)});
+        const entry=dvEnrichImport(xml,dvParseInvoiceXml(xml));
+        const foot=zip.file('word/footer1.xml');if(foot)entry.footerXml=await foot.async('string');
+        dvImportItems.push({name:file.name,entry});
       }catch(e){dvImportItems.push({name:file.name,error:e.message});}
     }
     const plan=dvImportPlan(dvImportItems,dvReadInvoices());dvRenderImport(plan);
     const fresh=plan.filter(i=>i.add);
-    status.textContent=fresh.length+' neue Rechnung(en), '+eur(fresh.reduce((s,i)=>s+i.entry.betrag,0))+'. Erst mit „Neue Rechnungen übernehmen“ speichern. Fehlerhafte Dateien und Nummernkonflikte werden ausgelassen.';
+    status.textContent=fresh.length+' neue / vervollständigte Rechnung(en), '+eur(fresh.reduce((s,i)=>s+i.entry.betrag,0))+'. Erst mit „Neue Rechnungen übernehmen“ speichern. Fehlerhafte Dateien und Nummernkonflikte werden ausgelassen.';
   }catch(e){status.textContent=e.message;}
   finally{dvImportBusy=false;document.getElementById('dvImportClose').disabled=false;}
 }
-async function dvCommitImport(){
-  if(dvImportBusy || !dvImportItems.length)return;
-  dvImportBusy=true;
-  document.getElementById('dvImportCommit').disabled=true;
-  document.getElementById('dvImportClose').disabled=true;
-  const status=document.getElementById('dvImportStatus');
-  status.textContent='Prüfe vorhandene Rechnungen …';
-  let committed=false;
-  try{
-    if(gToken){await gEnsureSheets();await gLoadRechnungen();}
-    let count=0,plan;
-    const commit=()=>{
-      const existing=dvReadInvoices();plan=dvImportPlan(dvImportItems,existing);
-      const fresh=plan.filter(i=>i.add).map(i=>({...i.entry,importedFrom:i.name}));
-      count=fresh.length;
-      if(count)localStorage.setItem('dv_rechnungen',JSON.stringify([...existing,...fresh]));
-      rechnungen=[...existing,...fresh];
-    };
-    if(navigator.locks)await navigator.locks.request('deskvalue-rechnungen',commit);else commit();
-    committed=true;
-    dvRenderImport(plan.map(i=>i.add?{...i,status:'Importiert',add:false}:i));
-    dvSuggestNumber();renderEuerList();
-    let synced=false;
-    if(gToken && count)synced=await gSyncAll();
-    status.textContent=count+' Rechnung(en) übernommen. '+(count?(synced?'Mit Google synchronisiert.':gToken?'Lokal gespeichert. Google-Synchronisierung fehlgeschlagen – bitte erneut synchronisieren.':'Lokal gespeichert. Für die Übernahme auf andere Geräte mit Google verbinden.'):'Keine neuen Datensätze.')+' Für die nächste Rechnung „Nächste freie Nummer“ wählen. Zahlungseingänge bitte gesondert prüfen.';
-    dvImportItems=[];
-  }catch(e){status.textContent=(committed?'Import lokal gespeichert. ':'Import nicht gespeichert. ')+e.message;}
-  finally{
-    dvImportBusy=false;document.getElementById('dvImportClose').disabled=false;
-    document.getElementById('dvImportCommit').disabled=committed || !dvImportItems.some(i=>i.entry);
+// Extend the import with complete invoice data; old summary rows can be enriched.
+function dvEnrichImport(xml,entry){
+ const doc=new DOMParser().parseFromString(xml,'application/xml'),text=node=>Array.from(node.getElementsByTagNameNS(DV_W,'t')).map(t=>t.textContent).join('').trim();
+ const paragraphs=Array.from(doc.getElementsByTagNameNS(DV_W,'body')[0].getElementsByTagNameNS(DV_W,'p')).map(text).filter(Boolean),title=paragraphs.indexOf('RECHNUNG');
+ const address=/^(\d{5})\s+(.+)$/.exec(paragraphs[title-1]||'');
+ const all=paragraphs.join('\n'),period=/Leistungszeitraum:\s*(\d{2}\.\d{2}\.\d{4})(?:\s*[–-]\s*(\d{2}\.\d{2}\.\d{4}))?/.exec(all),due=/Fälligkeitsdatum:\s*(\d{2}\.\d{2}\.\d{4})/.exec(all);
+ const iso=x=>x?x.split('.').reverse().join('-'):'';
+ const items=[];
+ for(const tr of doc.getElementsByTagNameNS(DV_W,'tr')){
+  const cells=Array.from(tr.getElementsByTagNameNS(DV_W,'tc'));if(cells.length!==5||!/^\d+$/.test(text(cells[0])))continue;
+  const desc=Array.from(cells[1].getElementsByTagNameNS(DV_W,'p')).map(text).filter(Boolean),qty=/^([\d.,]+)\s+(.+)$/.exec(text(cells[2]));
+  if(!qty||!desc.length)throw Error('Leistungsposition nicht eindeutig lesbar.');
+  const p={desc:desc[0],detail:desc.slice(1).join('\n'),qty:String(dvAmount(qty[1])),unit:qty[2],price:String(dvAmount(text(cells[3])))};
+  if(dvCents(ptot(p))!==dvCents(dvAmount(text(cells[4]))))throw Error('Positionsbetrag stimmt nicht mit Menge und Preis überein.');items.push(p);
+ }
+ if(!items.length||dvCents(items.reduce((s,p)=>s+ptot(p),0))!==dvCents(entry.betrag))throw Error('Positionssumme stimmt nicht mit Rechnungsbetrag überein.');
+ return {...entry,felder:{e_name:entry.empf,e_str:paragraphs[title-2],e_plz:address[1],e_ort:address[2],rg_nr:entry.nr,rg_dat:entry.datum,betreff:entry.betreff,lz_von:iso(period?.[1]),lz_bis:iso(period?.[2]||period?.[1]),faellig:iso(due?.[1]),auf_dat:''},positionen:items};
+}
+function dvImportPlan(items,existing){
+ const map=new Map(existing.map(r=>[dvImportKey(r.nr),r]));
+ return items.map(item=>{
+  if(item.error)return {...item,status:'Fehler: '+item.error,add:false};
+  const key=dvImportKey(item.entry.nr),old=map.get(key);
+  if(old){
+   const same=dvSameSummary({...old,nr:item.entry.nr},item.entry);
+   if(same&&!old.positionen&&item.entry.positionen){map.set(key,item.entry);return {...item,status:'Vorhandene Rechnung vervollständigen',add:true,enrich:true};}
+   return {...item,status:same?'Bereits vorhanden – übersprungen':'Nummernkonflikt – nicht übernommen',add:false};
   }
+  map.set(key,item.entry);return {...item,status:'Neu',add:true};
+ });
+}
+async function dvCommitImport(){
+ if(dvImportBusy||!dvImportItems.length)return;dvImportBusy=true;
+ const status=document.getElementById('dvImportStatus');document.getElementById('dvImportCommit').disabled=true;document.getElementById('dvImportClose').disabled=true;
+ try{
+  if(gToken){await gEnsureSheets();await gLoadRechnungen();}
+  let plan,count;
+  await dvMutate(db=>{
+   plan=dvImportPlan(dvImportItems,db.invoices);const fresh=plan.filter(x=>x.add);count=fresh.length;
+   for(const item of fresh){const r={...item.entry,id:dvImportKey(item.entry.nr),importedFrom:item.name,...dvStamp()};db.invoices=db.invoices.filter(x=>x.id!==r.id);db.invoices.push(r);}
+  });
+  dvRenderImport(plan.map(x=>x.add?{...x,status:x.enrich?'Vervollständigt':'Importiert',add:false}:x));dvSuggestNumber();dvImportItems=[];
+  status.textContent=count+' Rechnung(en) übernommen / vervollständigt. Zahlungseingänge unter „Rechnungen“ ergänzen. Es wurde keine Rechnung automatisch als bezahlt markiert.';
+  if(gToken){const ok=await gSyncAll();status.textContent+=ok?' Mit Google synchronisiert.':' Lokal gespeichert; Google-Synchronisierung ausstehend.';}
+ }catch(e){status.textContent='Import nicht abgeschlossen: '+e.message;document.getElementById('dvImportCommit').disabled=false;}
+ finally{dvImportBusy=false;document.getElementById('dvImportClose').disabled=false;}
 }
 
-// ── EÜR MODAL ───────────────────────────────────────────────
-// Gespeicherte Rechnungen für EÜR (Session-Speicher)
-// Number suggestions do not reserve a number. Save via the green button.
-let dvAutoNumber = true;
-let dvSaving = false;
-function dvLocalDate(d){
-  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+// DeskValue 4: one atomic local dataset, immutable invoices, explicit receipts.
+const DV_KEY='dv_data_v4';
+const DV_TYPES=['invoices','payments','expenses','customers','services','drafts'];
+const DV_FIELDS=['e_name','e_str','e_plz','e_ort','rg_nr','rg_dat','lz_von','lz_bis','faellig','betreff','auf_dat'];
+const DV_CATEGORIES=['Material / bezogene Leistungen','Raumkosten','Telefon / Internet / Porto','Bürobedarf','Software / Buchführung','Werbung','Fahrtkosten','Versicherung','Beratung / Fortbildung','Sonstige Betriebsausgaben'];
+let dvAutoNumber=true,dvSaving=false,dvReady=false,dvLoaded=null,dvTab='invoices',dvSelected=null,dvDraftTimer=null;
+let dvDirty=false,dvDevice='',dvSyncPromise=null,dvActionBusy=false;
+const dvUid=()=>crypto.randomUUID();
+const dvClone=x=>JSON.parse(JSON.stringify(x));
+let dvLastStamp=0;
+const dvStamp=()=>{dvLastStamp=Math.max(Date.now(),dvLastStamp+1);return {updatedAt:new Date(dvLastStamp).toISOString(),rev:dvUid()};};
+const dvCents=x=>Math.round((Number(x)+Number.EPSILON)*100);
+function dvLocalDate(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
+function dvDate(x){return /^\d{4}-\d{2}-\d{2}$/.test(x||'') && !Number.isNaN(Date.parse(x+'T12:00:00')) && dvLocalDate(new Date(x+'T12:00:00'))===x;}
+function dvBlank(){return {version:4,...Object.fromEntries(DV_TYPES.map(t=>[t,[]])),settings:{exportYear:new Date().getFullYear()}};}
+function dvRecordInvoice(r){return {...r,id:dvImportKey(r.nr),updatedAt:r.updatedAt||'2000-01-01T00:00:00.000Z',rev:r.rev||'legacy-'+dvImportKey(r.nr)};}
+function dvValidate(db){
+ if(!db || db.version!==4 || !db.settings || typeof db.settings!=='object')throw Error('Unbekanntes Datenformat.');
+ for(const type of DV_TYPES){
+  if(!Array.isArray(db[type]))throw Error('Ungültige Daten: '+type);
+  const ids=new Set();
+  for(const r of db[type]){
+   if(!r || typeof r.id!=='string' || !r.id || ids.has(r.id) || typeof r.rev!=='string' || !Number.isFinite(Date.parse(r.updatedAt)))throw Error('Ungültiger oder doppelter Datensatz: '+type);
+   ids.add(r.id);
+   if(type==='invoices'){
+    if(typeof r.nr!=='string'||!r.nr||!dvDate(r.datum)||typeof r.empf!=='string'||typeof r.betreff!=='string'||!Number.isFinite(r.betrag)||r.betrag<0||r.id!==dvImportKey(r.nr))throw Error('Ungültige Rechnung: '+r.nr);
+    if(r.positionen && (!Array.isArray(r.positionen)||r.positionen.some(p=>!p||['desc','detail','unit','qty','price'].some(k=>typeof p[k]!=='string'))))throw Error('Ungültige Positionen: '+r.nr);
+    if(r.felder && (typeof r.felder!=='object'||Array.isArray(r.felder)||Object.values(r.felder).some(v=>typeof v!=='string')))throw Error('Ungültige Rechnungsfelder.');
+   }
+   if(type==='payments' || type==='expenses'){
+    if(!dvDate(r.date)||!Number.isSafeInteger(r.cents)||r.cents<=0||r.cents>1e12)throw Error('Ungültige Zahlung / Ausgabe.');
+    if(type==='payments' && !db.invoices.some(i=>i.id===r.invoiceId))throw Error('Zahlung ohne zugehörige Rechnung.');
+    if(type==='expenses' && (typeof r.vendor!=='string'||typeof r.description!=='string'||typeof r.category!=='string'||typeof r.reference!=='string'))throw Error('Ungültige Ausgabenangaben.');
+   }
+   if(type==='customers' && ['name','street','zip','city','email'].some(k=>typeof r[k]!=='string'))throw Error('Ungültiger Kunde.');
+   if(type==='services' && (['label','unit','qty','price'].some(k=>typeof r[k]!=='string')||!Number.isFinite(Number(r.price))||Number(r.price)<0||Number(r.qty)<=0))throw Error('Ungültige Leistung.');
+   if(type==='drafts' && (!r.felder||typeof r.felder!=='object'||!Array.isArray(r.positionen)||Object.values(r.felder).some(v=>typeof v!=='string')||r.positionen.some(p=>['desc','detail','unit','qty','price'].some(k=>typeof p[k]!=='string'))))throw Error('Ungültiger Entwurf.');
+  }
+ }
+ return db;
 }
-function dvReadInvoices(){
-  const rows=JSON.parse(localStorage.getItem('dv_rechnungen')||'[]');
-  if(!Array.isArray(rows) || rows.some(r=>!r || typeof r.nr!=='string'))
-    throw new Error('Gespeicherte Rechnungsdaten sind beschädigt. Keine neue Nummer vergeben.');
-  return rows;
+function dvReadDB(){
+ const raw=localStorage.getItem(DV_KEY);let db;
+ if(raw)db=dvValidate(JSON.parse(raw));
+ else{
+  db=dvBlank();const old=JSON.parse(localStorage.getItem('dv_rechnungen')||'[]');
+  if(!Array.isArray(old))throw Error('Alte Rechnungsdaten können nicht gelesen werden.');
+  db.invoices=old.map(dvRecordInvoice);dvValidate(db);
+  localStorage.setItem(DV_KEY,JSON.stringify(db));
+ }
+ // Autosave writes its own key so a typing tab cannot overwrite invoice updates.
+ const stash=JSON.parse(localStorage.getItem('dv_local_draft_v4')||'null');
+ if(stash){const i=db.drafts.findIndex(d=>d.id===stash.id),old=db.drafts[i];if(!old||stash.updatedAt>old.updatedAt||(stash.updatedAt===old.updatedAt&&stash.rev>old.rev)){if(i>=0)db.drafts[i]=stash;else db.drafts.push(stash);}}
+ const year=Number(localStorage.getItem('dv_export_year_v4'));if(Number.isInteger(year)&&year>=2000&&year<=2199)db.settings.exportYear=year;
+ return dvValidate(db);
+}
+function dvWriteDB(db,dirty=true){
+ dvValidate(db);localStorage.setItem(DV_KEY,JSON.stringify(db));rechnungen=db.invoices;
+ if(dirty){dvDirty=true;localStorage.setItem('dv_unsynced_v4','1');}
+ dvStatus();
+}
+async function dvMutate(fn){
+ const work=()=>{const db=dvReadDB();const out=fn(db);dvWriteDB(db);return out;};
+ return navigator.locks?navigator.locks.request('deskvalue-data-v4',work):work();
 }
 let rechnungen=[];
-try { rechnungen=dvReadInvoices(); } catch(e) { alert(e.message); }
-function dvNumber(rows, date){
-  const year=(date||dvLocalDate(new Date())).slice(2,4);
-  let max=0;
-  for(const r of rows){
-    const m=/^RE_(\d{2})_(\d+)$/.exec(r.nr.trim());
-    if(m && m[1]===year){
-      const n=Number(m[2]);
-      if(!Number.isSafeInteger(n)) throw new Error('Rechnungsnummer außerhalb des gültigen Zahlenbereichs.');
-      max=Math.max(max,n);
-    }
-  }
-  if(!Number.isSafeInteger(max+1)) throw new Error('Nummernkreis ausgeschöpft.');
-  return 'RE_'+year+'_'+String(max+1).padStart(2,'0');
+function dvReadInvoices(){return dvReadDB().invoices;}
+function dvSameSummary(a,b){return ['nr','datum','empf','betreff'].every(k=>(a[k]||'')===(b[k]||''))&&dvCents(a.betrag)===dvCents(b.betrag);}
+function dvNumber(rows,date){
+ const yy=(date||dvLocalDate(new Date())).slice(2,4);let n=0;
+ for(const r of rows){const m=/^RE_(\d{2})_(\d+)$/.exec(r.nr.trim());if(m&&m[1]===yy)n=Math.max(n,Number(m[2]));}
+ if(!Number.isSafeInteger(n+1))throw Error('Nummernkreis ungültig.');return 'RE_'+yy+'_'+String(n+1).padStart(2,'0');
 }
 function dvSuggestNumber(){
-  const hint=document.getElementById('nr_hint');
-  try{
-    rechnungen=dvReadInvoices();
-    if(dvAutoNumber) document.getElementById('rg_nr').value=dvNumber(rechnungen,gv('rg_dat'));
-    hint.textContent=(gToken?'Stand der zuletzt geladenen Rechnungen.':'Nur lokaler Stand – vor Gerätewechsel Google synchronisieren.')+
-      ' Nummer wird mit „Rechnung speichern“ übernommen. Ein Word-Download allein speichert keine Rechnung.';
-    upd();
-  }catch(e){ hint.textContent=e.message; }
+ try{rechnungen=dvReadInvoices();if(dvAutoNumber&&!dvLoaded)document.getElementById('rg_nr').value=dvNumber(rechnungen,gv('rg_dat'));
+ document.getElementById('nr_hint').textContent=dvLoaded?'Gespeicherte Rechnung – geschützt. Für Änderungen als neue Vorlage verwenden.':'Vorschlag. Die Nummer wird beim Speichern übernommen.';upd();}
+ catch(e){dvNotice(e.message,true);}
 }
-async function dvNextNumber(){
-  try{
-    if(gToken) await gLoadRechnungen();
-    dvAutoNumber=true; dvSuggestNumber();
-  }catch(e){alert('Nummer konnte nicht ermittelt werden: '+e.message);}
+function dvNotice(text,error=false){const e=document.getElementById('dvNotice');if(e){e.textContent=text;e.className=error?'dv-notice error':'dv-notice';}}
+function dvStatus(){
+ const e=document.getElementById('dvDataStatus');if(!e)return;
+ const last=localStorage.getItem('dv_last_sync_v4');
+ e.textContent=dvDirty?'Änderungen nur auf diesem Gerät gespeichert – Google-Synchronisierung ausstehend.':last?'Daten mit Google synchronisiert: '+new Date(last).toLocaleString('de-DE'):'Daten nur auf diesem Gerät. Google verbinden oder Sicherung herunterladen.';
 }
-window.addEventListener('storage',e=>{if(e.key==='dv_rechnungen')dvSuggestNumber();});
-function dvEntry(){
-  return {nr:gv('rg_nr'),datum:gv('rg_dat'),empf:gv('e_name')||gv('e_str'),
-    betreff:gv('betreff'),betrag:grand(),
-    felder:Object.fromEntries(['e_name','e_str','e_plz','e_ort','lz_von','lz_bis','faellig','auf_dat'].map(k=>[k,gv(k)])),
-    positionen:positions.map(p=>({...p}))};
+function dvEntry(){return {nr:gv('rg_nr'),datum:gv('rg_dat'),empf:gv('e_name'),betreff:gv('betreff'),betrag:grand(),felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),footerXml:F1_XML};}
+function dvValidateEntry(e){
+ const missing=[];
+ for(const [k,label] of [['e_name','Empfänger'],['e_str','Straße'],['e_plz','PLZ'],['e_ort','Ort'],['betreff','Betreff']])if(!e.felder[k])missing.push(label);
+ if(!dvDate(e.datum))missing.push('Rechnungsdatum');
+ if(!dvDate(e.felder.lz_von)||!dvDate(e.felder.lz_bis)||e.felder.lz_bis<e.felder.lz_von)missing.push('gültiger Leistungszeitraum');
+ if(!dvDate(e.felder.faellig)||e.felder.faellig<e.datum)missing.push('Fälligkeit ab Rechnungsdatum');
+ if(!/^RE_\d{2}_\d{2,}$/.test(e.nr)||e.nr.slice(3,5)!==e.datum.slice(2,4)||!Number.isSafeInteger(Number(e.nr.slice(6)))||Number(e.nr.slice(6))<1)missing.push('Rechnungsnummer passend zum Jahr');
+ if(!e.positionen.length||e.positionen.length>100||e.positionen.some(p=>!p.desc.trim()||!p.qty.trim()||!p.price.trim()||!Number.isFinite(Number(p.qty))||Number(p.qty)<=0||!Number.isFinite(Number(p.price))||Number(p.price)<0))missing.push('vollständige Leistungspositionen (höchstens 100)');
+ if(/\[[^\]]+\]|XXXX/i.test([e.empf,e.betreff,...e.positionen.map(p=>p.desc+' '+p.detail)].join(' ')))missing.push('Platzhalter entfernen');
+ if(!Number.isSafeInteger(dvCents(e.betrag))||e.betrag<=0||e.betrag>1e10)missing.push('positiver Gesamtbetrag');
+ if(JSON.stringify(e).length>250000)missing.push('kürzere Rechnungstexte');
+ if(/XXXX|\[[^\]]+\]/i.test(F1_XML))missing.push('Absender-Platzhalter in der Vorlage ersetzen');
+ if(missing.length)throw Error('Bitte prüfen: '+missing.join(', ')+'.');
+ return e;
 }
-function dvSameSummary(a,b){
-  return ['nr','datum','empf','betreff'].every(k=>(a[k]||'')===(b[k]||'')) &&
-    Math.round(a.betrag*100)===Math.round(b.betrag*100);
+function dvLockForm(lock){
+ document.querySelectorAll('.form input,.form select,.form .ptable button,.form .add-btn').forEach(e=>e.disabled=lock);
+ document.getElementById('dvSaveButton').disabled=lock;document.getElementById('dvSavePdf').disabled=false;
 }
-async function saveRechnung(){
-  if(dvSaving)return;
-  dvSaving=true;
-  const entry=dvEntry();
-  const wasAuto=dvAutoNumber;
-  // Freeze this suggestion while the remote records are being read.
-  dvAutoNumber=false;
-  let localSaved=false;
-  try{
-    if(!entry.datum || !entry.empf || !positions.length || positions.some(p=>!p.desc.trim() || !Number.isFinite(Number(p.qty)) || Number(p.qty)<=0 || !p.price.trim() || !Number.isFinite(Number(p.price)) || Number(p.price)<0))
-      throw new Error('Bitte Rechnungsdatum, Empfänger und vollständige Positionen mit gültiger Menge und Preis eintragen.');
-    if(!/^RE_\d{2}_\d{2,}$/.test(entry.nr) || entry.nr.slice(3,5)!==entry.datum.slice(2,4) || Number(entry.nr.slice(6))<1)
-      throw new Error('Bitte eine Nummer wie RE_26_01 passend zum Rechnungsdatum verwenden.');
-    if(gToken) await gLoadRechnungen();
-    const commit=()=>{
-      const rows=dvReadInvoices();
-      const old=rows.find(r=>r.nr===entry.nr || (r.nr.slice(0,6)===entry.nr.slice(0,6) && Number(r.nr.slice(6))===Number(entry.nr.slice(6))));
-      if(old){
-        if(!dvSameSummary(old,entry) || !old.positionen || JSON.stringify(old.positionen)!==JSON.stringify(entry.positionen) || JSON.stringify(old.felder)!==JSON.stringify(entry.felder))
-          throw new Error('Nummer '+entry.nr+' ist bereits vergeben. Bestehende Rechnungen werden nicht überschrieben. Bitte „Nächste freie Nummer“ verwenden.');
-      } else {
-        const next=dvNumber(rows,entry.datum);
-        if(wasAuto && entry.nr!==next)
-          throw new Error('Der Rechnungsstand hat sich geändert. Bitte „Nächste freie Nummer“ wählen und erneut speichern.');
-        rows.push(entry);
-        localStorage.setItem('dv_rechnungen',JSON.stringify(rows));
-      }
-      rechnungen=rows;
-      localSaved=true;
-    };
-    if(navigator.locks) await navigator.locks.request('deskvalue-rechnungen',commit); else commit();
-    if(gToken){
-      const ok=await gSyncAll();
-      if(!ok) throw new Error('Lokal gespeichert, Google-Synchronisierung fehlgeschlagen. Bitte erneut synchronisieren, bevor du das Gerät wechselst.');
-    }
-    alert('Rechnung '+entry.nr+' gespeichert'+(gToken?' und mit Google synchronisiert.':'. Nur lokal – vor Gerätewechsel Google synchronisieren.'));
-    document.getElementById('nr_hint').textContent=entry.nr+' gespeichert. Für die nächste Rechnung „Nächste freie Nummer“ wählen.';
-  }catch(e){
-    if(!localSaved)dvAutoNumber=wasAuto;
-    alert(e.message);
-  }finally{dvSaving=false;}
+function dvFill(entry,locked=false){
+ dvReady=false;
+ const fields=entry.felder||{};
+ for(const id of DV_FIELDS)document.getElementById(id).value=fields[id]||'';
+ document.getElementById('rg_nr').value=entry.nr||fields.rg_nr||'';document.getElementById('rg_dat').value=entry.datum||fields.rg_dat||'';
+ document.getElementById('e_name').value=entry.empf||fields.e_name||'';document.getElementById('betreff').value=entry.betreff||fields.betreff||'';
+ positions=dvClone(entry.positionen||[{desc:'',detail:'',unit:'pau.',qty:'1',price:''}]);
+ dvLoaded=locked?entry:null;dvAutoNumber=!locked;renderPos();upd();dvLockForm(locked);dvReady=true;dvSuggestNumber();
 }
-
-function showEuer(){
-  const jahr=new Date().getFullYear()-1;
-  document.getElementById('euerJahr').value=jahr;
-  renderEuerList();
-  document.getElementById('euerModal').style.display='flex';
+function dvDraft(){return {id:dvDevice,felder:Object.fromEntries(DV_FIELDS.map(k=>[k,gv(k)])),positionen:dvClone(positions),...dvStamp()};}
+function dvHasWork(){return !!gv('e_name')||!!gv('betreff')||positions.some(p=>p.desc||p.price);}
+function dvSaveDraft(){
+ if(!dvReady||dvLoaded)return;
+ try{const r=dvDraft();localStorage.setItem('dv_local_draft_v4',JSON.stringify(r));dvDirty=true;localStorage.setItem('dv_unsynced_v4','1');dvStatus();
+ document.getElementById('dvDraftState').textContent='Entwurf auf diesem Gerät gesichert · '+new Date().toLocaleTimeString('de-DE');}
+ catch(e){dvNotice('Entwurf nicht gesichert: '+e.message,true);}
 }
-function closeEuer(){document.getElementById('euerModal').style.display='none';}
-
-function renderEuerList(){
-  const jahr=parseInt(document.getElementById('euerJahr').value)||new Date().getFullYear()-1;
-  const filtered=rechnungen.filter(r=>r.datum && r.datum.startsWith(jahr));
-  const tbody=document.getElementById('euerRgList');
-  if(filtered.length===0){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#888;padding:16px">Keine gespeicherten Rechnungen für '+jahr+'. Rechnungen über "Rechnung speichern" speichern.</td></tr>';
-  } else {
-    tbody.innerHTML=filtered.map((r,i)=>`
-      <tr>
-        <td style="padding:5px 8px">${r.datum?r.datum.split('-').reverse().join('.'):'–'}</td>
-        <td style="padding:5px 8px">${xe(r.nr)}</td>
-        <td style="padding:5px 8px">${xe(r.empf)}</td>
-        <td style="padding:5px 8px">${xe(r.betreff||'')}</td>
-        <td style="padding:5px 8px;text-align:right;font-weight:600">${eur(r.betrag)}</td>
-      </tr>`).join('');
+function dvQueueDraft(){if(!dvReady||dvLoaded)return;clearTimeout(dvDraftTimer);dvDraftTimer=setTimeout(dvSaveDraft,350);}
+function dvNewInvoice(){
+ if(!dvLoaded&&dvHasWork()&&!confirm('Aktuellen Entwurf ersetzen? Bei Bedarf zuerst unter „Entwürfe“ eine Kopie sichern.'))return;
+ clearTimeout(dvDraftTimer);dvLoaded=null;const today=dvLocalDate(new Date()),due=new Date();due.setDate(due.getDate()+14);
+ dvFill({felder:{rg_dat:today,faellig:dvLocalDate(due)},positionen:[{desc:'',detail:'',unit:'pau.',qty:'1',price:''}]});dvSaveDraft();mShow('form');dvNotice('Neue Rechnung.');
+}
+async function dvNextNumber(){if(dvLoaded){dvNotice('Gespeicherte Nummer bleibt unverändert. „Neue Rechnung“ oder „Als Vorlage“ wählen.');return;}dvAutoNumber=true;dvSuggestNumber();dvQueueDraft();}
+async function dvSaveInvoice(){
+ if(dvLoaded)return dvLoaded;
+ if(dvSaving)throw Error('Speichern läuft bereits.');
+ dvSaving=true;document.getElementById('dvSaveButton').disabled=true;
+ try{
+  const e=dvValidateEntry(dvEntry()),automatic=dvAutoNumber;
+  // Keep the form and number fixed while the server is consulted.
+  dvAutoNumber=false;dvLockForm(true);
+  if(gToken)await gLoadRechnungen();
+  const saved=await dvMutate(db=>{
+   if(db.invoices.some(r=>dvImportKey(r.nr)===dvImportKey(e.nr)))throw Error('Rechnungsnummer bereits vergeben. Bitte nächste freie Nummer verwenden.');
+   if(automatic&&dvNumber(db.invoices,e.datum)!==e.nr)throw Error('Der Rechnungsstand hat sich geändert. Bitte nächste freie Nummer verwenden.');
+   const r={...e,id:dvImportKey(e.nr),...dvStamp()};db.invoices.push(r);
+   const d=db.drafts.find(d=>d.id===dvDevice);if(d){d.deleted=true;Object.assign(d,dvStamp());}
+   return r;
+  });
+  localStorage.removeItem('dv_local_draft_v4');clearTimeout(dvDraftTimer);dvLoaded=saved;dvAutoNumber=false;dvLockForm(true);dvSuggestNumber();
+  document.getElementById('dvDraftState').textContent='Rechnung gespeichert und geschützt.';dvNotice(saved.nr+' auf diesem Gerät gespeichert.');
+  if(gToken)void gSyncAll();return saved;
+ }finally{dvSaving=false;if(!dvLoaded)dvLockForm(false);}
+}
+async function saveRechnung(){try{await dvSaveInvoice();}catch(e){dvNotice(e.message,true);alert(e.message);}}
+async function dvSaveAndPdf(){try{await dvSaveInvoice();savePdf();}catch(e){dvNotice(e.message,true);alert(e.message);}}
+function dvReceipts(db,id){return db.payments.filter(p=>p.invoiceId===id&&!p.deleted);}
+function dvBalance(db,r){return dvCents(r.betrag)-dvReceipts(db,r.id).reduce((s,p)=>s+p.cents,0);}
+function dvInvoiceStatus(db,r){const b=dvBalance(db,r);if(b<0)return 'Überzahlung';if(b===0)return 'Bezahlt';if(r.felder?.faellig&&r.felder.faellig<dvLocalDate(new Date()))return 'Überfällig';if(b<dvCents(r.betrag))return 'Teilbezahlt';return 'Offen';}
+const dvButton=(text,action,id='',extra='')=>`<button class="dv-btn" data-action="${action}" data-id="${xe(id)}" ${extra}>${xe(text)}</button>`;
+function dvField(id,label,value='',type='text',extra=''){return `<label class="dv-field">${xe(label)}<input id="${id}" type="${type}" value="${xe(String(value))}" ${extra}></label>`;}
+function dvShowManage(tab='invoices'){
+ dvTab=tab;dvSelected=null;dvRenderManage();const d=document.getElementById('dvManage');if(!d.open)d.showModal();
+}
+function dvRenderManage(){
+ const db=dvReadDB(),body=document.getElementById('dvManageBody');
+ document.querySelectorAll('#dvManageNav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===dvTab));
+ if(dvTab==='invoices'){
+  const query=(document.getElementById('dvSearch')?.value||'').toLowerCase(),filter=document.getElementById('dvFilter')?.value||'';
+  body.innerHTML=`<div class="dv-tools"><input id="dvSearch" placeholder="Nummer, Kunde oder Betreff suchen" value="${xe(query)}"><select id="dvFilter"><option value="">Alle Rechnungen</option>${['Offen','Teilbezahlt','Überfällig','Bezahlt','Überzahlung'].map(x=>`<option ${filter===x?'selected':''}>${x}</option>`).join('')}</select></div><div id="dvInvoiceList"></div>`;
+  dvRenderInvoices();return;
+ }
+ if(dvTab==='customers'){
+  body.innerHTML=`<p class="dv-info">Kunde speichern, bearbeiten oder in eine neue Rechnung übernehmen. Bestehende Rechnungen bleiben unverändert.</p><div class="dv-grid">${dvField('c_name','Firma / Name')}${dvField('c_street','Straße')}${dvField('c_zip','PLZ')}${dvField('c_city','Ort')}${dvField('c_email','E-Mail (optional)','','email')}</div><input id="c_id" type="hidden">${dvButton('Kunde speichern','saveCustomer')}<div class="dv-list">${db.customers.filter(r=>!r.deleted).map(r=>`<div class="dv-card"><b>${xe(r.name)}</b><p>${xe(r.street)}, ${xe(r.zip)} ${xe(r.city)}</p>${dvButton('Übernehmen','useCustomer',r.id)}${dvButton('Bearbeiten','editCustomer',r.id)}${dvButton('Entfernen','deleteCustomer',r.id)}</div>`).join('')||'<p>Noch keine Kunden gespeichert.</p>'}</div>`;return;
+ }
+ if(dvTab==='services'){
+  body.innerHTML=`<p class="dv-info">Eigene Leistungen erscheinen zusätzlich in der Schnellauswahl jeder Rechnungsposition.</p><div class="dv-grid">${dvField('s_label','Leistung')}${dvField('s_unit','Einheit','pau.')}${dvField('s_qty','Standardmenge','1','number','step="0.01" min="0.01"')}${dvField('s_price','Einzelpreis (€)','0','number','step="0.01" min="0"')}</div><input id="s_id" type="hidden">${dvButton('Leistung speichern','saveService')}<div class="dv-list">${db.services.filter(r=>!r.deleted).map(r=>`<div class="dv-card"><b>${xe(r.label)}</b> · ${eur(Number(r.price))} / ${xe(r.unit)}<div>${dvButton('Bearbeiten','editService',r.id)}${dvButton('Entfernen','deleteService',r.id)}</div></div>`).join('')||'<p>Noch keine eigenen Leistungen.</p>'}</div>`;return;
+ }
+ if(dvTab==='expenses'){
+  body.innerHTML=`<p class="dv-info">Hier bereits bezahlte betriebliche Ausgaben erfassen, jeweils nur den betrieblichen Anteil. Für Abschreibungen und Sonderfälle im Excel-Blatt „Ergebnis“ steuerliche Korrekturen ergänzen.</p><div class="dv-grid">${dvField('x_date','Zahlungsdatum',dvLocalDate(new Date()),'date')}${dvField('x_vendor','Empfänger')}${dvField('x_reference','Belegnummer')}${dvField('x_description','Beschreibung')}${dvField('x_amount','Betrieblicher Betrag (€)','','number','step="0.01" min="0.01"')}<label class="dv-field">Kategorie<select id="x_category">${DV_CATEGORIES.map(c=>`<option>${xe(c)}</option>`).join('')}</select></label></div>${dvButton('Ausgabe speichern','saveExpense')}<div class="dv-list">${db.expenses.filter(r=>!r.deleted).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="dv-card"><b>${fd(r.date)} · ${xe(r.vendor)} · ${eur(r.cents/100)}</b><p>${xe(r.reference)} · ${xe(r.description)} · ${xe(r.category)}</p>${dvButton('Fehleintrag aufheben','voidExpense',r.id)}</div>`).join('')||'<p>Noch keine Ausgaben erfasst.</p>'}</div>`;return;
+ }
+ if(dvTab==='drafts'){
+  body.innerHTML=`<p class="dv-info">Der aktuelle Entwurf wird auf diesem Gerät automatisch gesichert. Mit „Kopie sichern“ bleibt zusätzlich ein benannter Entwurf erhalten. Google synchronisiert Entwürfe bei „Jetzt synchronisieren“.</p>${dvButton('Aktuellen Entwurf als Kopie sichern','copyDraft')}<div class="dv-list">${db.drafts.filter(r=>!r.deleted).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).map(r=>`<div class="dv-card"><b>${xe(r.name||r.felder.e_name||'Leerer Entwurf')}</b><p>${xe(r.felder.betreff||'')} · ${new Date(r.updatedAt).toLocaleString('de-DE')}</p>${dvButton('Wiederherstellen','restoreDraft',r.id)}${dvButton('Entfernen','deleteDraft',r.id)}</div>`).join('')}</div>`;return;
+ }
+ if(dvTab==='backup'){
+  body.innerHTML=`<p class="dv-info">Sicherung enthält Rechnungsdaten, Zahlungen, Ausgaben, Kunden, Leistungen und Entwürfe. Google-Zugangstoken werden nicht mitgesichert. Originale Word- und PDF-Dateien bitte zusätzlich aufbewahren.</p><p>${db.invoices.length} Rechnungen · ${db.payments.filter(p=>!p.deleted).length} Zahlungen · ${db.expenses.filter(x=>!x.deleted).length} Ausgaben</p>${dvButton('Sicherung herunterladen','backup')}<label class="dv-field">Sicherungsdatei wiederherstellen<input type="file" id="dvBackupFile" accept=".json,application/json"></label><p class="dv-info">Vor der Übernahme wird eine Vorschau angezeigt. Vorhandene Einträge werden zusammengeführt; abweichende Rechnungen führen zum Abbruch.</p><div id="dvBackupPreview"></div>`;return;
+ }
+}
+function dvRenderInvoices(){
+ const db=dvReadDB(),q=(gv('dvSearch')||'').toLowerCase(),filter=gv('dvFilter');
+ const rows=db.invoices.filter(r=>(r.nr+' '+r.empf+' '+r.betreff).toLowerCase().includes(q)&&(!filter||dvInvoiceStatus(db,r)===filter)).sort((a,b)=>b.datum.localeCompare(a.datum)||b.nr.localeCompare(a.nr,undefined,{numeric:true}));
+ document.getElementById('dvInvoiceList').innerHTML=rows.map(r=>{
+ const state=dvInvoiceStatus(db,r),balance=dvBalance(db,r);
+ return `<div class="dv-card ${state==='Überfällig'?'overdue':''}"><div class="dv-cardhead"><b>${xe(r.nr)} · ${xe(r.empf)}</b><span class="dv-badge">${state}</span></div><p>${fd(r.datum)} · ${xe(r.betreff)}</p><p><b>${eur(r.betrag)}</b> · ${balance<0?'Überzahlung':'Offen'}: ${eur(Math.abs(balance)/100)}</p>${dvButton('Öffnen / Zahlungen','invoice',r.id)}${dvButton('Als Vorlage','template',r.id)}</div>`;
+ }).join('')||'<p class="dv-info">Keine passenden Rechnungen.</p>';
+}
+function dvInvoiceDetail(id){
+ const db=dvReadDB(),r=db.invoices.find(r=>r.id===id);if(!r)return;dvSelected=id;
+ const paid=dvReceipts(db,id),balance=dvBalance(db,r),complete=!!r.positionen?.length&&!!r.felder;
+ document.getElementById('dvManageBody').innerHTML=`${dvButton('← Übersicht','backInvoices')}<h3>${xe(r.nr)} · ${xe(r.empf)}</h3><p>${xe(r.betreff)}</p><p>${fd(r.datum)} · ${dvInvoiceStatus(db,r)} · Rechnungsbetrag <b>${eur(r.betrag)}</b> · ${balance<0?'Überzahlung':'Offen'} <b>${eur(Math.abs(balance)/100)}</b></p><div class="dv-tools">${dvButton('Rechnung ansehen','openInvoice',id,complete?'':'disabled')}${dvButton('Als Vorlage','template',id,complete?'':'disabled')}${dvButton('Zahlungserinnerung','reminder',id,balance>0?'':'disabled')}</div>${complete?'':'<p class="dv-info">Dieser ältere Eintrag enthält nur die Übersicht. Die ursprüngliche Word-Rechnung noch einmal importieren, um Anschrift, Positionen und Fälligkeit zu ergänzen.</p>'}
+ <h3>Zahlung erfassen</h3><div class="dv-grid">${dvField('p_date','Zahlungseingang',dvLocalDate(new Date()),'date')}${dvField('p_amount','Betrag (€)',balance>0?(balance/100).toFixed(2):'','number','step="0.01" min="0.01"')}${dvField('p_note','Vermerk (optional)')}</div>${dvButton('Zahlung speichern','savePayment',id)}<h3>Erfasste Zahlungen</h3>${paid.map(p=>`<div class="dv-card">${fd(p.date)} · <b>${eur(p.cents/100)}</b> · ${xe(p.note||'')}${dvButton('Fehleintrag aufheben','voidPayment',p.id)}</div>`).join('')||'<p>Noch kein Zahlungseingang erfasst. Das ist keine Aussage über deinen Kontoauszug.</p>'}<div id="dvReminder"></div>`;
+}
+function dvLoadInvoice(id,template=false){
+ const r=dvReadInvoices().find(r=>r.id===id);if(!r?.positionen?.length||!r.felder)throw Error('Bitte zuerst die vollständige Word-Rechnung importieren.');
+ if(!dvLoaded&&dvHasWork()&&!confirm('Aktuellen Entwurf ersetzen?'))return;
+ clearTimeout(dvDraftTimer);
+ if(template){const copy=dvClone(r);copy.nr='';copy.datum=dvLocalDate(new Date());copy.felder.rg_dat=copy.datum;copy.felder.rg_nr='';copy.felder.lz_von='';copy.felder.lz_bis='';copy.felder.auf_dat='';const due=new Date();due.setDate(due.getDate()+14);copy.felder.faellig=dvLocalDate(due);dvFill(copy,false);dvSaveDraft();dvNotice('Vorlage übernommen. Leistungszeitraum und Preise prüfen.');}
+ else{dvSaveDraft();dvFill(r,true);dvNotice('Gespeicherte Rechnung. Word und PDF können erneut ausgegeben werden.');}
+ document.getElementById('dvManage').close();mShow(template?'form':'preview');
+}
+async function dvAction(action,id){
+ if(dvActionBusy)return;dvActionBusy=true;
+ try{
+  const db=dvReadDB();
+  if(action==='backInvoices'){dvShowManage('invoices');return;}
+  if(action==='invoice'){dvInvoiceDetail(id);return;}
+  if(action==='template'||action==='openInvoice'){dvLoadInvoice(id,action==='template');return;}
+  if(action==='savePayment'){
+   const date=gv('p_date'),cents=dvCents(gv('p_amount')),note=gv('p_note');if(!dvDate(date)||date>dvLocalDate(new Date())||!Number.isSafeInteger(cents)||cents<=0)throw Error('Gültiges Zahlungsdatum (nicht zukünftig) und positiven Betrag eintragen.');
+   const r=db.invoices.find(r=>r.id===id);if(cents>dvBalance(db,r)&&!confirm('Die Zahlung übersteigt den offenen Betrag. Tatsächliche Überzahlung erfassen?'))return;
+   if(dvReceipts(db,id).some(p=>p.date===date&&p.cents===cents)&&!confirm('Eine gleich hohe Zahlung am selben Tag ist bereits erfasst. Weitere Zahlung erfassen?'))return;
+   await dvMutate(d=>d.payments.push({id:dvUid(),invoiceId:id,date,cents,note,...dvStamp()}));dvInvoiceDetail(id);
+  }else if(action==='voidPayment'||action==='voidExpense'){
+   if(!confirm('Diesen Fehleintrag aufheben? Die Aufhebung bleibt nachvollziehbar gespeichert.'))return;
+   const type=action==='voidPayment'?'payments':'expenses';await dvMutate(d=>{const r=d[type].find(x=>x.id===id);r.deleted=true;Object.assign(r,dvStamp());});
+   if(type==='payments')dvInvoiceDetail(dvSelected);else dvRenderManage();
+  }else if(action==='saveExpense'){
+   const date=gv('x_date'),cents=dvCents(gv('x_amount')),vendor=gv('x_vendor'),description=gv('x_description'),reference=gv('x_reference'),category=gv('x_category');
+   if(!dvDate(date)||date>dvLocalDate(new Date())||!Number.isSafeInteger(cents)||cents<=0||!vendor||!description||!reference)throw Error('Bitte Zahlungsdatum, Empfänger, Belegnummer, Beschreibung und positiven Betrag eintragen.');
+   if(db.expenses.some(x=>!x.deleted&&x.reference===reference&&x.vendor===vendor)&&!confirm('Diese Belegnummer ist für den Empfänger bereits vorhanden. Trotzdem erfassen?'))return;
+   await dvMutate(d=>d.expenses.push({id:dvUid(),date,cents,vendor,description,reference,category,...dvStamp()}));dvRenderManage();
+  }else if(action==='saveCustomer'){
+   const r={id:gv('c_id')||dvUid(),name:gv('c_name'),street:gv('c_street'),zip:gv('c_zip'),city:gv('c_city'),email:gv('c_email'),...dvStamp()};if(!r.name||!r.street||!r.zip||!r.city)throw Error('Bitte Kundenname und vollständige Anschrift eintragen.');
+   await dvMutate(d=>{d.customers=d.customers.filter(x=>x.id!==r.id);d.customers.push(r);});dvRenderManage();dvCustomerOptions();
+  }else if(action==='editCustomer'){
+   const r=db.customers.find(x=>x.id===id);for(const [a,b] of [['id','id'],['name','name'],['street','street'],['zip','zip'],['city','city'],['email','email']])document.getElementById('c_'+a).value=r[b];
+  }else if(action==='useCustomer'){
+   if(dvLoaded)throw Error('Zuerst „Neue Rechnung“ auswählen.');const r=db.customers.find(x=>x.id===id);for(const [f,k] of [['e_name','name'],['e_str','street'],['e_plz','zip'],['e_ort','city']])document.getElementById(f).value=r[k];document.getElementById('dvManage').close();upd();dvSaveDraft();
+  }else if(action==='saveService'){
+   const r={id:gv('s_id')||dvUid(),label:gv('s_label'),unit:gv('s_unit'),qty:gv('s_qty'),price:gv('s_price'),...dvStamp()};if(!r.label||!r.unit||!r.price||!Number.isFinite(Number(r.price))||Number(r.price)<0||!Number.isFinite(Number(r.qty))||Number(r.qty)<=0)throw Error('Bitte Leistung, Einheit, gültige Menge und Preis eintragen.');
+   await dvMutate(d=>{d.services=d.services.filter(x=>x.id!==r.id);d.services.push(r);});dvRenderManage();renderPos();dvLockForm(!!dvLoaded);
+  }else if(action==='editService'){
+   const r=db.services.find(x=>x.id===id);for(const k of ['id','label','unit','qty','price'])document.getElementById('s_'+k).value=r[k];
+  }else if(['deleteCustomer','deleteService','deleteDraft'].includes(action)){
+   if(!confirm('Eintrag entfernen?'))return;const type={deleteCustomer:'customers',deleteService:'services',deleteDraft:'drafts'}[action];await dvMutate(d=>{const r=d[type].find(x=>x.id===id);r.deleted=true;Object.assign(r,dvStamp());});dvRenderManage();dvCustomerOptions();renderPos();dvLockForm(!!dvLoaded);
+  }else if(action==='copyDraft'){
+   if(dvLoaded)throw Error('Gespeicherte Rechnung zuerst als Vorlage öffnen.');const name=prompt('Name des Entwurfs:',gv('e_name')||'Entwurf');if(name===null)return;const r={...dvDraft(),id:dvUid(),name};await dvMutate(d=>d.drafts.push(r));dvRenderManage();
+  }else if(action==='restoreDraft'){
+   if(!confirm('Diesen Entwurf laden und die aktuelle Eingabe ersetzen?'))return;const r=db.drafts.find(x=>x.id===id);dvFill(r,false);dvSaveDraft();document.getElementById('dvManage').close();mShow('form');
+  }else if(action==='backup'){dvBackup();return;}
+  else if(action==='restoreBackup'){await dvRestoreBackup();return;}
+  else if(action==='reminder'){
+   const r=db.invoices.find(x=>x.id===id),open=dvBalance(db,r)/100,deadline=new Date();deadline.setDate(deadline.getDate()+7);
+   const text=`Betreff: Zahlungserinnerung zur Rechnung ${r.nr}\n\nGuten Tag,\n\nzu unserer Rechnung ${r.nr} vom ${fd(r.datum)} über ${eur(r.betrag)} ist nach unseren Aufzeichnungen noch ein Betrag von ${eur(open)} offen.\n\nBitte prüfen Sie den Vorgang und überweisen Sie den offenen Betrag bis zum ${fd(dvLocalDate(deadline))} unter Angabe der Rechnungsnummer auf das bekannte Konto. Sollte sich Ihre Zahlung mit dieser Erinnerung überschnitten haben, betrachten Sie diese bitte als gegenstandslos.\n\nVielen Dank.\n\nMit freundlichen Grüßen\nJosef Benke\nDeskValue`;
+   document.getElementById('dvReminder').innerHTML='<h3>Zahlungserinnerung – Entwurf</h3><p>Vor Verwendung mit dem Kontoauszug abgleichen. Es wird nichts automatisch versendet.</p><textarea id="dvReminderText" rows="15"></textarea>'+dvButton('Text kopieren','copyReminder');document.getElementById('dvReminderText').value=text;return;
+  }else if(action==='copyReminder'){try{await navigator.clipboard.writeText(document.getElementById('dvReminderText').value);dvNotice('Erinnerung kopiert.');}catch{document.getElementById('dvReminderText').select();alert('Bitte den markierten Text kopieren.');}return;}
+  if(gToken&&['savePayment','voidPayment','saveExpense','voidExpense','saveCustomer','saveService','deleteCustomer','deleteService','deleteDraft','copyDraft'].includes(action))void gSyncAll();
+ }catch(e){alert(e.message);dvNotice(e.message,true);}
+ finally{dvActionBusy=false;}
+}
+function dvCustomerOptions(){const e=document.getElementById('dvCustomerSelect');if(!e)return;e.innerHTML='<option value="">Gespeicherten Kunden auswählen …</option>'+dvReadDB().customers.filter(x=>!x.deleted).map(x=>`<option value="${xe(x.id)}">${xe(x.name)}</option>`).join('');}
+function dvUseCustomer(){const id=gv('dvCustomerSelect');if(id)void dvAction('useCustomer',id);}
+function dvCaptureCustomer(){dvShowManage('customers');for(const [a,b] of [['name','e_name'],['street','e_str'],['zip','e_plz'],['city','e_ort']])document.getElementById('c_'+a).value=gv(b);}
+function dvAllPresets(){return [...PRESETS,...dvReadDB().services.filter(x=>!x.deleted)];}
+function dvBackup(){
+ dvSaveDraft();const db=dvReadDB();saveAs(new Blob([JSON.stringify({app:'DeskValue',version:4,exportedAt:new Date().toISOString(),data:db},null,2)],{type:'application/json'}),'DeskValue_Sicherung_'+dvLocalDate(new Date())+'.json');dvNotice('Sicherungsdownload gestartet. Datei sicher aufbewahren.');
+}
+let dvBackupPending=null;
+async function dvReadBackup(file){
+ try{if(!file||file.size>25*1024*1024)throw Error('Bitte eine Sicherungsdatei bis 25 MB auswählen.');const x=JSON.parse(await file.text());if(x.app!=='DeskValue'||x.version!==4)throw Error('Keine DeskValue-4-Sicherung.');dvValidate(x.data);dvMerge(dvReadDB(),x.data);dvBackupPending=x.data;
+ document.getElementById('dvBackupPreview').innerHTML=`<p>${x.data.invoices.length} Rechnungen, ${x.data.payments.length} Zahlungseinträge und ${x.data.expenses.length} Ausgaben. Gleiche Datensatz-IDs werden nicht doppelt übernommen. Bei bearbeitbaren Einträgen gilt die neuere Fassung.</p>${dvButton('Sicherung zusammenführen','restoreBackup')}`;
+ }catch(e){dvBackupPending=null;document.getElementById('dvBackupPreview').textContent=e.message;}
+}
+async function dvRestoreBackup(){if(!dvBackupPending)return;await dvMutate(d=>{const merged=dvMerge(d,dvBackupPending);for(const t of DV_TYPES)d[t]=merged[t];d.settings={...d.settings,...dvBackupPending.settings};});if(dvBackupPending.settings.exportYear)localStorage.setItem('dv_export_year_v4',String(dvBackupPending.settings.exportYear));dvBackupPending=null;dvSuggestNumber();dvCustomerOptions();dvRenderManage();dvNotice('Sicherung übernommen. Entwürfe können unter „Entwürfe“ geladen werden.');if(gToken)void gSyncAll();}
+function dvCanonical(x){if(Array.isArray(x))return '['+x.map(dvCanonical).join(',')+']';if(x&&typeof x==='object')return '{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+dvCanonical(x[k])).join(',')+'}';return JSON.stringify(x);}
+function dvMerge(a,b){
+ const out=dvClone(a);
+ for(const type of DV_TYPES){
+  const map=new Map(out[type].map(x=>[x.id,x]));
+  for(const r of b[type]){
+   const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
+   if(type==='invoices'){
+    if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Abweichende Daten zur Rechnungsnummer '+r.nr+'. Keine Daten überschrieben.');
+    if(old.positionen&&r.positionen&&(dvCanonical(old.positionen)!==dvCanonical(r.positionen)||dvCanonical(old.felder)!==dvCanonical(r.felder)))throw Error('Abweichende Rechnungsdetails zu '+r.nr+'. Bitte Originaldateien prüfen.');
+    if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
+   }else{
+    // Identical IDs represent the same payment/expense; only a void flag may change.
+    if(type==='payments'||type==='expenses'){
+     const core=x=>Object.fromEntries(Object.entries(x).filter(([k])=>!['rev','updatedAt','deleted'].includes(k)));
+     if(dvCanonical(core(old))!==dvCanonical(core(r)))throw Error('Abweichende Zahlungs-/Ausgabendaten mit gleicher ID.');
+     if(r.deleted&&!old.deleted)map.set(r.id,dvClone(r));
+    }else if(r.updatedAt>old.updatedAt||(r.updatedAt===old.updatedAt&&r.rev>old.rev))map.set(r.id,dvClone(r));
+   }
   }
-  // Gesamtsumme
-  const sum=filtered.reduce((s,r)=>s+r.betrag,0);
-  document.getElementById('euerSumme').textContent='Einnahmen gesamt: '+eur(sum);
+  out[type]=[...map.values()];
+ }
+ return dvValidate(out);
 }
-
-function exportEuer(){
-  const jahr=parseInt(document.getElementById('euerJahr').value)||new Date().getFullYear()-1;
-  const filtered=rechnungen.filter(r=>r.datum&&r.datum.startsWith(jahr));
-  
-  const WB=XLSX.utils.book_new();
-
-  // ── SHEET 1: EINNAHMEN ──────────────────────────────────────
-  const einData=[
-    ['Einnahmen-Überschuss-Rechnung (EÜR) nach §4 Abs. 3 EStG'],
-    ['Steuerpflichtiger: Josef Benke, DeskValue – Bürodienstleistungen & Immobilienbewertung, Krügers Kamp 9a, 33106 Paderborn'],
-    ['Steuerjahr: '+jahr,'','','','','Kleinunternehmer gem. §19 UStG – keine USt ausgewiesen'],
-    [],
-    ['EINNAHMEN'],
-    ['Datum','Rechnungsnummer','Empfänger','Betreff / Leistung','Nettobetrag (€)'],
-    ...filtered.map(r=>[
-      r.datum?r.datum.split('-').reverse().join('.'):'-',
-      r.nr, r.empf||'', r.betreff||'', r.betrag
-    ]),
-    [],
-    ['','','','Summe Einnahmen:','=SUM(E7:E'+(6+filtered.length)+')'],
-  ];
-  const ws1=XLSX.utils.aoa_to_sheet(einData);
-
-  // Spaltenbreiten
-  ws1['!cols']=[{wch:14},{wch:16},{wch:28},{wch:38},{wch:16}];
-
-  // ── SHEET 2: AUSGABEN ───────────────────────────────────────
-  const ausgabenKat=[
-    ['Wareneinkauf / bezogene Leistungen', 'Direkte Kosten für erbrachte Leistungen'],
-    ['Personalkosten (Löhne, Gehälter, AN-SV)', 'Bruttolöhne + Arbeitgeberanteile SV'],
-    ['Raumkosten (Miete, Nebenkosten)', 'Büroanteil Miete, Heizung, Strom'],
-    ['Fahrtkosten', '0,30 €/km (einfache Fahrt) oder tatsächliche Kosten'],
-    ['Kfz-Kosten', 'Versicherung, Steuer, Reparatur, Wartung'],
-    ['Telefon / Internet / Porto', 'Betrieblicher Anteil'],
-    ['Bürobedarf / Arbeitsmittel', 'Papier, Toner, Kleingeräte < 800 € netto'],
-    ['Fachliteratur / Fortbildung', 'Fachbücher, Seminare, Kurse'],
-    ['Rechts- und Beratungskosten', 'Steuerberater, Anwalt, Notar'],
-    ['Buchführungskosten / Software', 'DATEV, Buchhaltungssoftware, Abonnements'],
-    ['Werbekosten / Akquise', 'Werbung, Visitenkarten, Website'],
-    ['Abschreibungen (AfA)', 'Gemäß AfA-Tabelle (Anlageverzeichnis beachten)'],
-    ['Versicherungen (betrieblich)', 'Berufs-, Betriebs-, Haftpflichtversicherung'],
-    ['Sonstige Betriebsausgaben', 'Kontoführung, Mitgliedsbeiträge, sonstiges'],
-  ];
-  const ausgabenHeader=[
-    ['AUSGABEN – '+jahr],
-    ['Kategorie','Hinweis / Erläuterung','Betrag (€)'],
-  ];
-  const ausgabenRows=ausgabenKat.map(([kat,hint])=>[kat,hint,0]);
-  const sumRow=ausgabenRows.length+ausgabenHeader.length;
-  const ausgData=[
-    ...ausgabenHeader,
-    ...ausgabenRows,
-    [],
-    ['','Summe Ausgaben:','=SUM(C3:C'+(ausgabenRows.length+2)+')'],
-  ];
-  const ws2=XLSX.utils.aoa_to_sheet(ausgData);
-  ws2['!cols']=[{wch:42},{wch:48},{wch:16}];
-
-  // ── SHEET 3: ZUSAMMENFASSUNG ────────────────────────────────
-  const einSumRow=6+filtered.length+1; // Zeile der Summenformel in Sheet 1
-  const ausSumRow=ausgabenRows.length+3;  // Zeile der Summenformel in Sheet 2
-
-  const zsData=[
-    ['GEWINNERMITTLUNG NACH §4 Abs. 3 EStG'],
-    ['Steuerpflichtiger:','Josef Benke'],
-    ['Betrieb / Tätigkeit:','DeskValue – Bürodienstleistungen & Immobilienbewertung'],
-    ['Steuerjahr:',jahr],
-    ['Erstellungsdatum:',new Date().toLocaleDateString('de-DE')],
-    [],
-    ['BETRIEBSEINNAHMEN',''],
-    ['Einnahmen aus Leistungen (Rechnungen)','=Einnahmen!E'+einSumRow],
-    ['Sonstige Betriebseinnahmen (manuell eintragen)',0],
-    ['Summe Betriebseinnahmen','=SUM(B8:B9)'],
-    [],
-    ['BETRIEBSAUSGABEN',''],
-    ['Summe Betriebsausgaben','=Ausgaben!C'+ausSumRow],
-    [],
-    ['GEWINN / VERLUST',''],
-    ['Gewinn vor Steuern (§4 Abs. 3 EStG)','=B10-B13'],
-    [],
-    ['Hinweise:',''],
-    ['– Kleinunternehmer gem. §19 UStG: keine Umsatzsteuer ausgewiesen und nicht abziehbar',''],
-    ['– Privatanteil Kfz/Telefon bitte in Ausgaben bereits herausgerechnet',''],
-    ['– Für Anlage EÜR (Formular): Werte aus dieser Zusammenfassung übertragen',''],
-    ['– Bei Zweifeln Steuerberater hinzuziehen',''],
-  ];
-  const ws3=XLSX.utils.aoa_to_sheet(zsData);
-  ws3['!cols']=[{wch:52},{wch:20}];
-
-  XLSX.utils.book_append_sheet(WB,ws1,'Einnahmen');
-  XLSX.utils.book_append_sheet(WB,ws2,'Ausgaben');
-  XLSX.utils.book_append_sheet(WB,ws3,'Gewinnermittlung');
-
-  const xlsxBuf=XLSX.write(WB,{type:'array',bookType:'xlsx'});
-  saveAs(new Blob([xlsxBuf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
-    'DeskValue_EÜR_'+jahr+'.xlsx');
-  closeEuer();
+function dvCashRows(db,year){return db.payments.filter(p=>!p.deleted&&p.date.startsWith(String(year))).map(p=>({...p,invoice:db.invoices.find(r=>r.id===p.invoiceId)})).sort((a,b)=>a.date.localeCompare(b.date));}
+function showEuer(){const db=dvReadDB();document.getElementById('euerJahr').value=db.settings.exportYear||new Date().getFullYear();renderEuerList();document.getElementById('euerModal').style.display='flex';}
+function closeEuer(){document.getElementById('euerModal').style.display='none';}
+function dvExportYear(){const y=Number(gv('euerJahr'));if(!Number.isInteger(y)||y<2000||y>2199)throw Error('Bitte ein Jahr zwischen 2000 und 2199 auswählen.');return y;}
+function renderEuerList(){
+ try{const year=dvExportYear(),db=dvReadDB();if(db.settings.exportYear!==year)localStorage.setItem('dv_export_year_v4',String(year));const rows=dvCashRows(db,year);
+ document.getElementById('euerRgList').innerHTML=rows.map(p=>`<tr><td>${fd(p.date)}</td><td>${xe(p.invoice.nr)}</td><td>${xe(p.invoice.empf)}</td><td>${xe(p.invoice.betreff)}</td><td>${eur(p.cents/100)}</td></tr>`).join('')||'<tr><td colspan="5">Keine Zahlungseingänge für dieses Jahr erfasst. Zahlungen unter „Rechnungen“ ergänzen.</td></tr>';
+ document.getElementById('euerSumme').textContent='Erfasste Einnahmen: '+eur(rows.reduce((s,p)=>s+p.cents,0)/100);
+ const open=db.invoices.filter(r=>dvBalance(db,r)>0);document.getElementById('dvEuerNote').textContent=open.length+' Rechnung(en) mit offenem oder noch nicht erfasstem Zahlungseingang. Rechnungsdatum und Zahlungsdatum können unterschiedlichen Jahren angehören. Der Export enthält nur erfasste Zahlungen und Ausgaben; steuerliche Sonderfälle gesondert prüfen.';
+ }catch(e){document.getElementById('euerSumme').textContent=e.message;}
 }
+// Real cell formula objects, with cached numeric results for preview applications.
+function dvWorkbook(db,year){
+ const wb=XLSX.utils.book_new(),money='#,##0.00 "€"',f=(formula,value)=>({t:'n',f:formula,v:value,z:money});
+ const receipts=dvCashRows(db,year),expenses=db.expenses.filter(x=>!x.deleted&&x.date.startsWith(String(year))).sort((a,b)=>a.date.localeCompare(b.date));
+ const income=receipts.reduce((s,p)=>s+p.cents,0)/100,cost=expenses.reduce((s,p)=>s+p.cents,0)/100;
+ function add(name,data,widths,moneyCols=[]){const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=widths.map(wch=>({wch}));for(let i=0;i<data.length;i++)for(const j of moneyCols){const cell=ws[XLSX.utils.encode_cell({r:i,c:j})];if(cell?.t==='n')cell.z=money;}XLSX.utils.book_append_sheet(wb,ws,name);return ws;}
+ const erows=receipts.map(p=>[fd(p.date),p.invoice.nr,p.invoice.empf,p.invoice.betreff,p.cents/100,p.note||'']);
+ const xrows=expenses.map(x=>[fd(x.date),x.reference,x.vendor,x.description,x.category,x.cents/100]);
+ // Editable empty rows allow supplemental entries without changing sum ranges.
+ const eData=[['Einnahmen / Zahlungseingänge '+year],['Nur tatsächliche Zahlungseingänge eintragen. Ergänzungen in Excel ändern nicht die App.'],[],['Zahlungsdatum','Rechnung','Kunde','Beschreibung','Betrag (€)','Vermerk'],...erows,...Array.from({length:20},()=>['','','','',null,''])];
+ const eEnd=eData.length;eData.push(['','','','Summe',f('SUM(E5:E'+eEnd+')',income),'']);const eSum=eData.length;
+ const xData=[['Betriebliche Ausgaben / Zahlungen '+year],['Nur betrieblichen Anteil eintragen. Anschaffungen ggf. über AfA statt voller Zahlung abziehen.'],[],['Zahlungsdatum','Belegnummer','Empfänger','Beschreibung','Kategorie','Betrag (€)'],...xrows,...Array.from({length:30},()=>['','','','','',null])];
+ const xEnd=xData.length;xData.push(['','','','','Summe',f('SUM(F5:F'+xEnd+')',cost)]);const xSum=xData.length;
+ const summary=[['Einnahmen und Ausgaben – '+year],['Josef Benke · DeskValue'],['Stand',dvLocalDate(new Date())],[],['Erfasste Einnahmen',f("'Einnahmen'!E"+eSum,income)],['Erfasste Ausgaben',f("'Ausgaben'!F"+xSum,cost)],['Überschuss aus erfassten Zahlungen',f('B5-B6',income-cost)],[],['Steuerliche Korrekturen – nur soweit erforderlich'],['Weitere Einnahmen / Hinzurechnungen',0],['Weitere Abzüge / AfA',0],['Ergebnis nach Korrekturen',f('B7+B10-B11',income-cost)],[],['Erläuterung zu Hinzurechnungen',''],['Erläuterung zu Abzügen / AfA',''],[],['Nicht erfasste Zahlungen sind nicht automatisch Null.'],['Vor Verwendung Vollständigkeit mit Kontoauszügen und Belegen prüfen.'],['Keine automatische Behandlung steuerlicher Sonderfälle (z. B. AfA, Privatanteile, Jahreswechsel-Ausnahmen).'],['Originalbelege getrennt aufbewahren. Diese Aufstellung ersetzt nicht die amtliche Anlage EÜR.']];
+ add('Ergebnis',summary,[80,24],[1]);add('Einnahmen',eData,[16,20,30,48,18,30],[4]);add('Ausgaben',xData,[16,22,30,42,30,18],[5]);
+ add('Rechnungsübersicht',[['Rechnungen – Gesamtbestand, keine Einnahmensumme'],['Rechnungsdatum','Nummer','Kunde','Betreff','Rechnungsbetrag','Erfasste Zahlungen','Offen / Überzahlung (-)','Status'],...db.invoices.map(r=>[fd(r.datum),r.nr,r.empf,r.betreff,r.betrag,(dvCents(r.betrag)-dvBalance(db,r))/100,dvBalance(db,r)/100,dvInvoiceStatus(db,r)])],[18,20,30,48,20,20,25,20],[4,5,6]);
+ wb.Workbook={CalcPr:{calcMode:'auto',fullCalcOnLoad:true,forceFullCalc:true}};return wb;
+}
+function exportEuer(){try{if(typeof XLSX==='undefined')throw Error('Excel-Bibliothek noch nicht geladen. Bitte Seite mit Internetverbindung neu laden.');const year=dvExportYear(),wb=dvWorkbook(dvReadDB(),year);saveAs(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'DeskValue_EÜR_'+year+'.xlsx');closeEuer();}catch(e){alert(e.message);}}
 
 // ── GOOGLE SHEETS SYNC ──────────────────────────────────────
 const G_CLIENT_ID = "138686778658-98nf5f3vdh50nchepopgr18d81bcdnk3.apps.googleusercontent.com";
@@ -1092,13 +1224,6 @@ function gSignIn(){
   if(gToken){ gSyncAll(); return; }
   if(!gTokenClient){ alert("Google-API lädt noch – bitte 2 Sekunden warten und erneut klicken."); return; }
   gTokenClient.requestAccessToken({prompt:"consent"});
-}
-
-function gAfterConnect(){
-  const btn = document.getElementById("gBtn");
-  btn.textContent = "Jetzt synchronisieren";
-  btn.onclick = gSyncAll;
-  gEnsureSheets().then(()=>gLoadRechnungen()).catch(e=>gSetStatus("err","Fehler: "+e.message));
 }
 
 function gSetStatus(type, msg, sub){
@@ -1165,87 +1290,109 @@ async function gEnsureSheets(){
   }
 }
 
-let dvSyncPromise=null;
-function gSyncAll(){
-  if(!dvSyncPromise)dvSyncPromise=dvSyncRun().finally(()=>{dvSyncPromise=null;});
-  return dvSyncPromise;
-}
-async function dvSyncRun(){
-  if(!gToken){ gSignIn(); return; }
-  gSetStatus("load","Synchronisiere...");
-  try{
-    await gEnsureSheets();
-    await gLoadRechnungen();
-    await gPushRechnungen();
-    await gSaveEntwurf();
-    await gLoadRechnungen();
-    gSetStatus("ok","Synchronisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}));
-  }catch(e){
-    gSetStatus("err","Fehler: "+e.message);
-    return false;
-  }
-  return true;
-}
-
-async function gPushRechnungen(){
-  const local = JSON.parse(localStorage.getItem("dv_rechnungen")||"[]");
-  if(!local.length) return;
-  let existing = [];
-  try{
-    const r = await gReq("GET","/values/"+encodeURIComponent(G_SHEET_RG+"!B2:B"));
-    existing = (r.values||[]).map(row=>row[0]);
-  }catch(e){throw e;}
-  const neu = local.filter(r=>!existing.includes(r.nr));
-  if(!neu.length) return;
-  const rows = neu.map(r=>[
-    r.datum ? r.datum.split("-").reverse().join(".") : "",
-    r.nr, r.empf||"", r.betreff||"",
-    Number((r.betrag||0).toFixed(2))
-  ]);
-  await gReq("POST","/values/"+encodeURIComponent(G_SHEET_RG+"!A:E")+":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{values:rows});
-}
-
 function dvAmount(value){
-  if(typeof value==='number')return value;
-  const s=String(value||'0').replace(/[\s€]/g,'');
-  const n=Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s);
-  if(!Number.isFinite(n))throw new Error('Ungültiger Betrag in Google Sheets: '+value);
-  return n;
+ if(typeof value==='number'&&Number.isFinite(value))return value;
+ const raw=String(value||'0').replace(/[\s€]/g,'');
+ const n=Number(raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw);
+ if(!Number.isFinite(n))throw Error('Ungültiger Betrag: '+value);return n;
+}
+const DV_SHEET='DeskValue_Daten_v4';
+async function dvEnsureDataSheet(){
+ const meta=await gReq('GET','?fields=sheets.properties.title');
+ if(!meta.sheets.some(s=>s.properties.title===DV_SHEET)){
+  try{await gReq('POST',':batchUpdate',{requests:[{addSheet:{properties:{title:DV_SHEET}}}]});}
+  catch(e){const check=await gReq('GET','?fields=sheets.properties.title');if(!check.sheets.some(s=>s.properties.title===DV_SHEET))throw e;}
+  await gReq('PUT','/values/'+encodeURIComponent(DV_SHEET+'!A1:F1')+'?valueInputOption=RAW',{values:[['Typ','ID','Version','Teil','Anzahl','Daten']]});
+ }
+}
+function dvCloudRows(db,have=new Set()){
+ const rows=[];
+ for(const type of DV_TYPES)for(const r of db[type]){
+  const key=type+'|'+r.id+'|'+r.rev;if(have.has(key))continue;
+  const json=JSON.stringify(r),chunks=[];for(let i=0;i<json.length;i+=25000)chunks.push(json.slice(i,i+25000));
+  chunks.forEach((chunk,i)=>rows.push([type,r.id,r.rev,i+1,chunks.length,chunk]));
+ }
+ return rows;
+}
+function dvParseCloud(rows){
+ const groups=new Map(),db=dvBlank(),have=new Set();
+ for(const row of rows){if(!row[0]||row[0]==='Typ')continue;if(!DV_TYPES.includes(row[0]))throw Error('Unbekanntes Datenformat in Google.');
+  const [type,id,rev]=row,key=type+'|'+id+'|'+rev,part=Number(row[3]),total=Number(row[4]);
+  if(!Number.isInteger(part)||!Number.isInteger(total)||total<1||total>100||part<1||part>total||typeof row[5]!=='string')throw Error('Unvollständige Daten in Google.');
+  let g=groups.get(key);if(!g){g={type,id,rev,total,chunks:new Map()};groups.set(key,g);}
+  if(g.total!==total||(g.chunks.has(part)&&g.chunks.get(part)!==row[5]))throw Error('Widersprüchliche Daten in Google.');g.chunks.set(part,row[5]);
+ }
+ // All records must be reassembled before merge (payments reference invoices).
+ const versions=[];
+ for(const [key,g] of groups){if(g.chunks.size!==g.total)throw Error('Unvollständiger Google-Datensatz. Bitte erneut synchronisieren.');const r=JSON.parse(Array.from({length:g.total},(_,i)=>g.chunks.get(i+1)).join(''));if(r.id!==g.id||r.rev!==g.rev)throw Error('Ungültige Google-Daten.');versions.push({type:g.type,r});have.add(key);}
+ for(const type of DV_TYPES){for(const {r} of versions.filter(v=>v.type===type)){
+  const one=dvBlank();one[type]=[r];const merged=dvMergeUnchecked(db,one);db[type]=merged[type];
+ }}
+ dvValidate(db);return {db,have};
+}
+// Merging complete snapshots needs reference checks only after all types are present.
+function dvMergeUnchecked(a,b){
+ const out=dvClone(a);
+ for(const type of DV_TYPES){
+  const map=new Map(out[type].map(r=>[r.id,r]));
+  for(const r of b[type]){
+   const old=map.get(r.id);if(!old){map.set(r.id,dvClone(r));continue;}
+   if(type==='invoices'){
+    if(!dvSameSummary({...old,nr:r.nr},r))throw Error('Nummernkonflikt '+r.nr+' in Google.');
+    if(old.positionen&&r.positionen&&(dvCanonical(old.positionen)!==dvCanonical(r.positionen)||dvCanonical(old.felder)!==dvCanonical(r.felder)))throw Error('Abweichende Rechnungsdetails '+r.nr+' in Google.');
+    if(!old.positionen&&r.positionen)map.set(r.id,dvClone(r));
+   }else if(type==='payments'||type==='expenses'){
+    const core=x=>Object.fromEntries(Object.entries(x).filter(([k])=>!['rev','updatedAt','deleted'].includes(k)));
+    if(dvCanonical(core(old))!==dvCanonical(core(r)))throw Error('Zahlungskonflikt in Google.');
+    if(r.deleted&&!old.deleted)map.set(r.id,dvClone(r));
+   }else if(r.updatedAt>old.updatedAt||(r.updatedAt===old.updatedAt&&r.rev>old.rev))map.set(r.id,dvClone(r));
+  }
+  out[type]=[...map.values()];
+ }
+ return out;
+}
+async function dvReadRemote(){
+ await dvEnsureDataSheet();
+ const [legacy,data]=await Promise.all([
+  gReq('GET','/values/'+encodeURIComponent(G_SHEET_RG+'!A:E')),
+  gReq('GET','/values/'+encodeURIComponent(DV_SHEET+'!A:F'))
+ ]);
+ const result=dvParseCloud(data.values||[]),old=dvBlank();
+ const seen=new Map();
+ for(const x of (legacy.values||[]).slice(1).filter(r=>r[1])){
+  const date=String(x[0]||''),m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(date);
+  const r=dvRecordInvoice({nr:String(x[1]).trim(),datum:m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):date,empf:String(x[2]||''),betreff:String(x[3]||''),betrag:dvAmount(x[4])});
+  if(seen.has(r.id)){if(!dvSameSummary(seen.get(r.id),r))throw Error('Abweichende doppelte Nummer in Google: '+r.nr);continue;}
+  seen.set(r.id,r);old.invoices.push(r);
+ }
+ result.db=dvMerge(result.db,old);result.legacyIds=new Set(old.invoices.map(r=>r.id));return result;
 }
 async function gLoadRechnungen(){
-  const r=await gReq('GET','/values/'+encodeURIComponent(G_SHEET_RG+'!A:E'));
-  const rows=(r.values||[]).slice(1).filter(x=>x[1]);
-  const merged=new Map(dvReadInvoices().map(r=>[r.nr,r]));
-  const seen=new Set();
-  for(const x of rows){
-    const date=String(x[0]||'');
-    const parts=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(date);
-    const entry={datum:parts?parts[3]+'-'+parts[2].padStart(2,'0')+'-'+parts[1].padStart(2,'0'):date,
-      nr:String(x[1]).trim(),empf:String(x[2]||''),betreff:String(x[3]||''),betrag:dvAmount(x[4])};
-    if(seen.has(entry.nr))throw new Error('Doppelte Rechnungsnummer in Google Sheets: '+entry.nr);
-    seen.add(entry.nr);
-    const old=merged.get(entry.nr);
-    if(old && !dvSameSummary(old,entry))throw new Error('Abweichende Daten für '+entry.nr+' in Browser und Google Sheets. Bitte prüfen; keine Daten überschrieben.');
-    if(!old)merged.set(entry.nr,entry);
-  }
-  rechnungen=[...merged.values()];
-  localStorage.setItem('dv_rechnungen',JSON.stringify(rechnungen));
-  dvSuggestNumber();
+ const remote=await dvReadRemote();
+ await dvMutate(db=>{const merged=dvMerge(db,remote.db);for(const type of DV_TYPES)db[type]=merged[type];});
+ dvSuggestNumber();dvCustomerOptions();return remote;
 }
-
-async function gSaveEntwurf(){
-  const entwurf = {
-    felder:{
-      e_name:gv("e_name"), e_str:gv("e_str"), e_plz:gv("e_plz"), e_ort:gv("e_ort"),
-      rg_nr:gv("rg_nr"), rg_dat:gv("rg_dat"), lz_von:gv("lz_von"), lz_bis:gv("lz_bis"),
-      faellig:gv("faellig"), betreff:gv("betreff"), auf_dat:gv("auf_dat")
-    },
-    positionen: positions
-  };
-  await gReq("POST","/values/"+encodeURIComponent(G_SHEET_ENT+"!A:B")+":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{
-    values:[[new Date().toLocaleString("de-DE"), JSON.stringify(entwurf)]]
-  });
+async function gPushRechnungen(known){
+ const remote=known||await dvReadRemote();const db=dvReadDB();
+ const fresh=db.invoices.filter(r=>!remote.legacyIds.has(r.id));
+ if(fresh.length)await gReq('POST','/values/'+encodeURIComponent(G_SHEET_RG+'!A:E')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{values:fresh.map(r=>[fd(r.datum),r.nr,r.empf,r.betreff,r.betrag])});
 }
+function gSyncAll(){if(!gToken){gSignIn();return Promise.resolve(false);}if(!dvSyncPromise)dvSyncPromise=dvSyncRun().finally(()=>dvSyncPromise=null);return dvSyncPromise;}
+async function dvSyncRun(){
+ gSetStatus('load','Synchronisiere alle Daten …');
+ try{
+  clearTimeout(dvDraftTimer);dvSaveDraft();await gEnsureSheets();const remote=await gLoadRechnungen();
+  const snapshot=dvReadDB(),rows=dvCloudRows(snapshot,remote.have);
+  for(let i=0;i<rows.length;i+=100)await gReq('POST','/values/'+encodeURIComponent(DV_SHEET+'!A:F')+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{values:rows.slice(i,i+100)});
+  await gPushRechnungen(remote);
+  const check=await dvReadRemote();
+  await dvMutate(db=>{const merged=dvMerge(db,check.db);for(const type of DV_TYPES)db[type]=merged[type];});
+  dvDirty=dvCloudRows(dvReadDB(),check.have).length>0;
+  if(!dvDirty){localStorage.removeItem('dv_unsynced_v4');localStorage.setItem('dv_last_sync_v4',new Date().toISOString());}
+  gSetStatus('ok',dvDirty?'Weitere lokale Änderungen – erneut synchronisieren':'Alle Daten synchronisiert');dvStatus();dvSuggestNumber();dvCustomerOptions();if(document.getElementById('dvManage').open&&dvTab==='invoices'&&!dvSelected)dvRenderInvoices();return !dvDirty;
+ }catch(e){dvDirty=true;localStorage.setItem('dv_unsynced_v4','1');gSetStatus('err','Synchronisierung fehlgeschlagen');dvStatus();dvNotice(e.message,true);return false;}
+}
+function gAfterConnect(){const b=document.getElementById('gBtn');b.textContent='Jetzt synchronisieren';b.onclick=gSyncAll;void gSyncAll();}
 
 window.addEventListener("load", ()=>setTimeout(gInit, 600));
 
@@ -1287,6 +1434,25 @@ function togglePreview(){
   sheet.style.display=previewVisible?"block":"none";
   btn.textContent=previewVisible?"Ausblenden":"Einblenden";
 }
+function dvInitV4(){
+ try{
+  dvDevice=localStorage.getItem('dv_device_v4');if(!dvDevice){dvDevice=dvUid();localStorage.setItem('dv_device_v4',dvDevice);}
+  const db=dvReadDB();rechnungen=db.invoices;dvDirty=localStorage.getItem('dv_unsynced_v4')==='1';
+  const draft=db.drafts.find(d=>d.id===dvDevice&&!d.deleted);
+  if(draft){dvFill(draft,false);dvNotice('Letzter Entwurf wiederhergestellt.');}else{dvReady=true;dvSuggestNumber();}
+  dvCustomerOptions();dvStatus();
+  document.getElementById('dvManage').addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button&&!button.disabled)void dvAction(button.dataset.action,button.dataset.id);const tab=e.target.closest('[data-tab]');if(tab)dvShowManage(tab.dataset.tab);});
+  document.getElementById('dvManage').addEventListener('input',e=>{if(e.target.id==='dvSearch'||e.target.id==='dvFilter')dvRenderInvoices();});
+  document.getElementById('dvManage').addEventListener('change',e=>{if(e.target.id==='dvBackupFile')void dvReadBackup(e.target.files[0]);});
+  document.querySelector('.form').addEventListener('input',dvQueueDraft);document.querySelector('.form').addEventListener('change',dvQueueDraft);
+  document.getElementById('dvImportDialog').addEventListener('cancel',e=>{if(dvImportBusy)e.preventDefault();});
+ }catch(e){dvReady=false;dvNotice('Daten konnten nicht geladen werden: '+e.message,true);document.getElementById('dvSaveButton').disabled=true;}
+}
+window.addEventListener('pagehide',()=>{clearTimeout(dvDraftTimer);dvSaveDraft();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){clearTimeout(dvDraftTimer);dvSaveDraft();}});
+window.addEventListener('storage',e=>{if(e.key===DV_KEY){try{dvSuggestNumber();dvCustomerOptions();dvDirty=localStorage.getItem('dv_unsynced_v4')==='1';dvStatus();}catch(err){dvNotice(err.message,true);}}});
+document.addEventListener('DOMContentLoaded',dvInitV4);
+
 </script>
 </body>
 </html>
